@@ -8,16 +8,11 @@ set(NELLI_MLIR_PYTHON_PACKAGES_DIR
 add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=nelli.mlir._mlir.")
 declare_mlir_python_sources(NelliPythonSources)
 
-# TODO(max): figure out how to prevent cpps from being "installed"
-# get_property(MLIR_D_LIBS GLOBAL PROPERTY MLIR_DIALECT_LIBS)
-# get_property(MLIR_C_LIBS GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
-# get_property(MLIR_T_LIBS GLOBAL PROPERTY MLIR_TRANSLATION_LIBS)
 include_directories(.)
 
 add_subdirectory(TilingInterface)
 add_subdirectory(RefBackend)
 add_subdirectory(Transform)
-add_subdirectory(RaiseToAffine)
 add_subdirectory(LinalgTransforms)
 add_subdirectory(FakeQuantize)
 add_subdirectory(GPUTransforms)
@@ -35,13 +30,13 @@ declare_mlir_python_extension(
   LoopUtils.cpp
   AffineAnalysis.cpp
   PRIVATE_LINK_LIBS
+  MLIRAnalysis
   MLIRPresburger
   MLIRAffineAnalysis
   MLIRSparseTensorPipelines
   TilingInterfacePasses
   RefBackend
   TransformDialectInterpreter
-  RaiseToAffine
   LinalgTransforms
   FakeQuantize
   GPUTransforms
@@ -63,14 +58,16 @@ declare_mlir_python_extension(
   MLIRIR)
 target_link_libraries(
   NelliPythonSources.SiteInitialize
-  INTERFACE MLIROpenMPToLLVMIRTranslation CommonExtensions
-            StructuredTransformOpsExt LLVMGPUExtensions)
+  INTERFACE
+  MLIROpenMPToLLVMIRTranslation
+#  CommonExtensions
+#  StructuredTransformOpsExt
+#  LLVMGPUExtensions
+)
 
 set(PYBINDINGS_SRC "${MLIR_INSTALL_PREFIX}/src/python/MLIRPythonExtension.Core")
 target_include_directories(NelliPythonSources.Extension
                            INTERFACE "${PYBINDINGS_SRC}")
-# target_sources(NelliPythonSources.Extension INTERFACE
-# "${PYBINDINGS_SRC}/PybindUtils.cpp")
 
 execute_process(
   COMMAND python ${CMAKE_SOURCE_DIR}/scripts/regex_mlir_bindings.py

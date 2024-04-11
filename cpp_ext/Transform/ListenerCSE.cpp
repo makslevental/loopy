@@ -12,15 +12,15 @@
 #include "mlir/IR/OpDefinition.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "llvm/ADT/ScopedHashTable.h"
-#include "llvm/Support/RecyclingAllocator.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/RecyclingAllocator.h"
 
 using llvm::dbgs;
 #define DEBUG_TYPE "listener-cse"
@@ -446,9 +446,9 @@ void CSE::doItOnOperation(Operation *rootOp, DominanceInfo *domInfo,
 LogicalResult
 mlir::eliminateCommonSubexpressions(Operation *op, DominanceInfo *domInfo,
                                     RewriterBase::Listener *listener) {
-//  assert(op->hasTrait<OpTrait::IsIsolatedFromAbove>() &&
-//         "can only do CSE on isolated-from-above ops");
-  Optional<DominanceInfo> defaultDomInfo;
+  //  assert(op->hasTrait<OpTrait::IsIsolatedFromAbove>() &&
+  //         "can only do CSE on isolated-from-above ops");
+  std::optional<DominanceInfo> defaultDomInfo;
   if (domInfo == nullptr) {
     defaultDomInfo.emplace(op);
     domInfo = &*defaultDomInfo;
@@ -456,7 +456,6 @@ mlir::eliminateCommonSubexpressions(Operation *op, DominanceInfo *domInfo,
   CSE().doItOnOperation(op, domInfo, listener);
   return success();
 }
-
 
 //===----------------------------------------------------------------------===//
 // TrackingListener
@@ -667,7 +666,7 @@ void checkImplementsTransformHandleTypeInterface(TypeID typeID,
                                                  MLIRContext *context) {
   const auto &abstractType = AbstractType::lookup(typeID, context);
   assert((abstractType.hasInterface(
-      TransformHandleTypeInterface::getInterfaceID()) ||
+              TransformHandleTypeInterface::getInterfaceID()) ||
           abstractType.hasInterface(
               TransformParamTypeInterface::getInterfaceID()) ||
           abstractType.hasInterface(

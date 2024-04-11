@@ -1,12 +1,12 @@
-PyYAML
+
+-f https://github.com/makslevental/cibuildwheel-llvm-mlir/releases/expanded_assets/latest
 cibuildwheel
 cmake
+mlir==17.0.0+6c7fd723
 ninja
 numpy
 pip
-pybind11
+pybind11[global]
+PyYAML
 setuptools>=42
 wheel
-cmakelang
-#auditwheel
-#patchelf

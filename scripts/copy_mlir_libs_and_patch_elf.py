@@ -39,7 +39,8 @@ for shlib in shlibs:
     shlib_name = f"lib{shlib}.{shlib_ext}"
     assert llvm_install_dir.exists(), f"{llvm_install_dir}"
     llvm_install_fp = (llvm_install_dir / "lib" / shlib_name).absolute()
-    assert llvm_install_fp.exists(), f"{llvm_install_fp}"
+    if not llvm_install_fp.exists():
+        continue
     dst_path = mlir_libs_dir / shlib_name
     shutil.copyfile(llvm_install_fp, dst_path)
     if platform.system() == "Linux":

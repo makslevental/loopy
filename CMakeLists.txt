@@ -1,51 +1,44 @@
 cmake_minimum_required(VERSION 3.13.4)
 
-if (POLICY CMP0068)
-    cmake_policy(SET CMP0068 NEW)
-    set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
-endif ()
+if(POLICY CMP0068)
+  cmake_policy(SET CMP0068 NEW)
+  set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
+endif()
 
-if (POLICY CMP0075)
-    cmake_policy(SET CMP0075 NEW)
-endif ()
+if(POLICY CMP0075)
+  cmake_policy(SET CMP0075 NEW)
+endif()
 
-if (POLICY CMP0077)
-    cmake_policy(SET CMP0077 NEW)
-endif ()
+if(POLICY CMP0077)
+  cmake_policy(SET CMP0077 NEW)
+endif()
 
-if (POLICY CMP0116)
-    cmake_policy(SET CMP0116 NEW)
-endif ()
+if(POLICY CMP0116)
+  cmake_policy(SET CMP0116 NEW)
+endif()
 
 project(nelli LANGUAGES CXX C)
 
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 
-set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
+set(CMAKE_CXX_STANDARD
+    17
+    CACHE STRING "C++ standard to conform to")
 
-set(LLVM_INSTALL_DIR "" CACHE STRING "Path to LLVM install dir")
-if (LLVM_INSTALL_DIR STREQUAL "")
-    execute_process(COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/setup.py" --llvm-url OUTPUT_VARIABLE LLVM_URL)
-    include(FetchContent)
-    FetchContent_Populate(
-            MLIR
-            URL "${LLVM_URL}"
-            SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/llvm_install"
-    )
-    list(APPEND CMAKE_PREFIX_PATH)
-    set(LLVM_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/llvm_install")
-endif ()
-message(STATUS "LLVM_INSTALL_DIR: ${LLVM_INSTALL_DIR}")
-list(APPEND CMAKE_PREFIX_PATH "${LLVM_INSTALL_DIR}")
+set(LLVM_INSTALL_DIR
+    ""
+    CACHE STRING "Path to LLVM install dir")
+if(LLVM_INSTALL_DIR STREQUAL "")
+  execute_process(
+    COMMAND "${Python3_EXECUTABLE}" -c "import mlir; print(mlir.__path__[0])"
+    OUTPUT_VARIABLE LLVM_INSTALL_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif()
+include(CMakePrintHelpers)
+cmake_print_variables(LLVM_INSTALL_DIR)
+list(APPEND CMAKE_PREFIX_PATH ${LLVM_INSTALL_DIR})
+cmake_print_variables(CMAKE_PREFIX_PATH)
 find_package(MLIR REQUIRED CONFIG)
-
-# TODO(max): this doesn't seem to have any effect; other assertions percolate up (but this own has disappeared?)
-# even in release builds
-# first_for_loop_operations[1].operation.operands[0].owner
-# Assertion failed: (mlirOperationEqual(self.getParentOperation()->get(), mlirOpResultGetOwner(self.get())) &&
-# "expected the owner of the value in Python to match that in " "the IR"), function operator(), file IRCore.cpp, line 3124.
-#set(LLVM_ENABLE_ASSERTIONS OFF)
-#set(LLVM_ENABLE_ABI_BREAKING_CHECKS OFF)
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")

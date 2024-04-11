@@ -1,10 +1,10 @@
-PyYAML
-# pycapi
 bytecode
+multiprocess
 numpy
 pytest
+pytest-forked
+pytest-xdist
 scipy
 symengine
 sympy
 z3-solver==4.12.1.0
-multiprocess

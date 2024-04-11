@@ -99,7 +99,7 @@ class TestTiling:
             @mlir_func(range_ctor=scf_range)
             def loop_unroll_op():
                 for i in range(0, 42, 5):
-                    v = i + i
+                    i + i
 
             @sequence
             def basic(target, *extra_args):
@@ -179,7 +179,7 @@ class TestTiling:
             @sequence
             def basic(target, *extra_args):
                 m = match(target, ["tensor.pad"])
-                tiled = tile_to_scf_for(m, tile_sizes=[2, 3])
+                tile_to_scf_for(m, tile_sizes=[2, 3])
 
         correct = dedent(
             """\
@@ -194,7 +194,7 @@ class TestTiling:
           transform.sequence  failures(propagate) attributes {transform.target_tag = "basic"} {
           ^bb0(%arg0: !pdl.operation):
             %0 = transform.structured.match ops{["tensor.pad"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-            %tiled_linalg_op, %loops:2 = transform.structured.tile_to_scf_for %0[2, 3]
+            %tiled_linalg_op, %loops:2 = transform.structured.tile_to_scf_for %0[2, 3] : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation)
           }
         }
         """
@@ -226,9 +226,9 @@ class TestTiling:
           func.func @pad_tensor_3_4(%arg0: tensor<4x16xf32>, %arg1: f32) -> tensor<12x23xf32> {
             %c23 = arith.constant 23 : index
             %c12 = arith.constant 12 : index
+            %c0 = arith.constant 0 : index
             %c3 = arith.constant 3 : index
             %c2 = arith.constant 2 : index
-            %c0 = arith.constant 0 : index
             %0 = tensor.empty() : tensor<12x23xf32>
             %1 = scf.for %arg2 = %c0 to %c12 step %c2 iter_args(%arg3 = %0) -> (tensor<12x23xf32>) {
               %2 = scf.for %arg4 = %c0 to %c23 step %c3 iter_args(%arg5 = %arg3) -> (tensor<12x23xf32>) {
@@ -292,7 +292,7 @@ class TestTiling:
             @sequence
             def basic(target, *extra_args):
                 m = match(target, ["linalg.matmul"])
-                tiled = tile_linalg_to_scf_for(m, sizes=[2, 3])
+                tile_linalg_to_scf_for(m, sizes=[2, 3])
 
         correct = dedent(
             """\
@@ -374,7 +374,7 @@ class TestTiling:
             @sequence
             def basic(target, *extra_args):
                 m = match(target, ["linalg.matmul"])
-                tiled = tile_linalg_to_scf_for(m, sizes=[2, 3])
+                tile_linalg_to_scf_for(m, sizes=[2, 3])
 
         module = self.backend.compile(
             module,
@@ -445,7 +445,7 @@ class TestTiling:
             @sequence
             def basic(target, *extra_args):
                 m = match(target, ["linalg.matmul"])
-                tiled = tile_to_scf_forall(m, tile_sizes=[2, 3])
+                tile_to_scf_forall(m, tile_sizes=[2, 3])
 
         correct = dedent(
             """\
@@ -457,7 +457,7 @@ class TestTiling:
           transform.sequence  failures(propagate) attributes {transform.target_tag = "basic"} {
           ^bb0(%arg0: !pdl.operation):
             %0 = transform.structured.match ops{["linalg.matmul"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-            %forall_op, %tiled_op = transform.structured.tile_to_forall_op %0   tile_sizes [2, 3]
+            %forall_op, %tiled_op = transform.structured.tile_to_forall_op %0   tile_sizes [2, 3] : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
           }
         }
         """
@@ -525,9 +525,9 @@ class TestTiling:
               }
 
               transform.sequence failures(propagate) {
-              ^bb1(%arg1: !pdl.operation):
-                %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-                %1:2 = transform.structured.tile_to_forall_op %0 num_threads [10, 20] (mapping = [ #gpu.thread<y>, #gpu.thread<x> ] )
+              ^bb1(%arg1: !transform.any_op):
+                %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+                %1:2 = transform.structured.tile_to_forall_op %0 num_threads [10, 20] (mapping = [ #gpu.thread<y>, #gpu.thread<x> ] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
               }
             }
             """
@@ -633,11 +633,11 @@ class TestTiling:
             }
 
             transform.sequence failures(propagate) {
-            ^bb1(%arg1: !pdl.operation):
-              %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-              %1 = get_closest_isolated_parent %0 : (!pdl.operation) -> !pdl.operation
-              %2 = transform.structured.vectorize %1  { disable_multi_reduction_to_contract_patterns }
-            } 
+            ^bb1(%arg1: !transform.any_op):
+              %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+              %1 = get_parent_op %0 {isolated_from_above} : (!transform.any_op) -> !transform.any_op
+              %2 = transform.structured.vectorize %1  { disable_multi_reduction_to_contract_patterns } : (!transform.any_op) -> !transform.any_op
+            }
             """
                 )
             )
@@ -684,11 +684,11 @@ class TestTiling:
             }
 
             transform.sequence failures(propagate) {
-            ^bb1(%arg1: !pdl.operation):
-              %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-              %1 = get_closest_isolated_parent %0 : (!pdl.operation) -> !pdl.operation
-              %2 = transform.structured.vectorize %1
-            } 
+            ^bb1(%arg1: !transform.any_op):
+              %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+              %1 = get_parent_op %0 {isolated_from_above} : (!transform.any_op) -> !transform.any_op
+              %2 = transform.structured.vectorize %1 : (!transform.any_op) -> !transform.any_op
+            }
             """
                 )
             )
@@ -715,57 +715,6 @@ class TestTiling:
         invoker.contraction_matmul(A, B, C)
         assert np.allclose(A @ B, C)
 
-    def test_contraction_matmul(self):
-        with mlir_mod_ctx() as module:
-            module = module.parse(
-                dedent(
-                    """\
-            func.func @contraction_matmul(%A: memref<10x10xf32>, %B: memref<10x10xf32>, %C: memref<10x10xf32>) {
-              linalg.matmul ins(%A, %B: memref<10x10xf32>, memref<10x10xf32>)
-                        outs(%C: memref<10x10xf32>)
-              return
-            }
-
-            transform.sequence failures(propagate) {
-            ^bb1(%arg1: !pdl.operation):
-              %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-              %1 = get_closest_isolated_parent %0 : (!pdl.operation) -> !pdl.operation
-              %2 = transform.structured.vectorize %1  { disable_multi_reduction_to_contract_patterns }
-            } 
-            """
-                )
-            )
-        run_pipeline(
-            module,
-            Pipeline()
-            .transform_dialect_interpreter()
-            .transform_dialect_erase_schedule()
-            .materialize(),
-        )
-
-        correct = dedent(
-            """\
-        module {
-          func.func @contraction_matmul(%arg0: memref<10x10xf32>, %arg1: memref<10x10xf32>, %arg2: memref<10x10xf32>) {
-            %c0 = arith.constant 0 : index
-            %cst = arith.constant 0.000000e+00 : f32
-            %0 = vector.transfer_read %arg0[%c0, %c0], %cst {in_bounds = [true, true]} : memref<10x10xf32>, vector<10x10xf32>
-            %1 = vector.broadcast %0 : vector<10x10xf32> to vector<10x10x10xf32>
-            %2 = vector.transpose %1, [1, 0, 2] : vector<10x10x10xf32> to vector<10x10x10xf32>
-            %3 = vector.transfer_read %arg1[%c0, %c0], %cst {in_bounds = [true, true]} : memref<10x10xf32>, vector<10x10xf32>
-            %4 = vector.broadcast %3 : vector<10x10xf32> to vector<10x10x10xf32>
-            %5 = vector.transpose %4, [0, 2, 1] : vector<10x10x10xf32> to vector<10x10x10xf32>
-            %6 = vector.transfer_read %arg2[%c0, %c0], %cst {in_bounds = [true, true]} : memref<10x10xf32>, vector<10x10xf32>
-            %7 = arith.mulf %2, %5 : vector<10x10x10xf32>
-            %8 = vector.multi_reduction <add>, %7, %6 [2] : vector<10x10x10xf32> to vector<10x10xf32>
-            vector.transfer_write %8, %arg2[%c0, %c0] {in_bounds = [true, true]} : vector<10x10xf32>, memref<10x10xf32>
-            return
-          }
-        }
-        """
-        )
-        check_correct(correct, module)
-
     def test_common_extension_with_pdl_patterns(self):
         with mlir_mod_ctx() as module:
             module = module.parse(
@@ -778,11 +727,13 @@ class TestTiling:
             }
 
             transform.with_pdl_patterns {
-            ^bb0(%arg0: !pdl.operation):
-              transform.sequence %arg0 : !pdl.operation failures(propagate) {
-              ^bb1(%arg1: !pdl.operation):
-                %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-                transform.apply_patterns %0 { canonicalization } : (!pdl.operation) -> ()
+            ^bb0(%arg0: !transform.any_op):
+              transform.sequence %arg0 : !transform.any_op failures(propagate) {
+              ^bb1(%arg1: !transform.any_op):
+                %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+                transform.apply_patterns to %0 {
+                    transform.apply_patterns.canonicalization
+                  } : !transform.any_op
               }
             }
             """
@@ -817,11 +768,13 @@ class TestTiling:
               %1 = arith.select %0, %arg0, %arg1 : i64
               return %1 : i64
             }
-            
+
             transform.sequence  failures(propagate) {
-            ^bb0(%arg0: !pdl.operation):
-              %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-              transform.apply_patterns %0 { canonicalization } : (!pdl.operation) -> ()
+            ^bb0(%arg0: !transform.any_op):
+              %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+              transform.apply_patterns to %0 {
+                transform.apply_patterns.canonicalization
+              } : !transform.any_op
             }
             """
                 )
@@ -857,7 +810,7 @@ class TestTiling:
             @sequence
             def basic(target, *extra_args):
                 m = match(target, ["func.func"])
-                n = apply_patterns(m, canonicalization=True)
+                apply_patterns(m, canonicalization=True)
 
         correct = dedent(
             """\
@@ -868,9 +821,9 @@ class TestTiling:
             return %1 : i64
           }
           transform.sequence  failures(propagate) attributes {transform.target_tag = "basic"} {
-          ^bb0(%arg0: !pdl.operation):
-            %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-            apply_patterns %0 {canonicalization} : (!pdl.operation) -> ()
+          ^bb0(%arg0: !transform.any_op):
+            %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+            apply_patterns %0 {canonicalization} : (!transform.any_op) -> ()
           }
         }
         """
@@ -926,9 +879,9 @@ class TestTiling:
         }
 
         transform.sequence failures(propagate) {
-        ^bb1(%arg1: !pdl.operation):
-          %0 = transform.structured.match ops{["scf.forall"]} in %arg1 : (!pdl.operation) -> !pdl.operation
-          %1 = transform.cast %0 : !pdl.operation to !transform.op<"scf.forall">
+        ^bb1(%arg1: !transform.any_op):
+          %0 = transform.structured.match ops{["scf.forall"]} in %arg1 : (!transform.any_op) -> !transform.any_op
+          %1 = transform.cast %0 : !transform.any_op to !transform.op<"scf.forall">
           transform.share_forall_operands %1 share_operands = [0] : (!transform.op<"scf.forall">) -> !transform.op<"scf.forall">
         }
         """
@@ -1019,7 +972,7 @@ class TestTiling:
             def basic(target, *extra_args):
                 m = match(target, ["scf.forall"])
                 k = cast("scf.forall", m)
-                l = share_forall_operands(k, share_operands=[0])
+                share_forall_operands(k, share_operands=[0])
 
         correct = dedent(
             """\
@@ -1041,9 +994,9 @@ class TestTiling:
             return
           }
           transform.sequence  failures(propagate) attributes {transform.target_tag = "basic"} {
-          ^bb0(%arg0: !pdl.operation):
-            %0 = transform.structured.match ops{["scf.forall"]} in %arg0 : (!pdl.operation) -> !pdl.operation
-            %1 = cast %0 : !pdl.operation to !transform.op<"scf.forall">
+          ^bb0(%arg0: !transform.any_op):
+            %0 = transform.structured.match ops{["scf.forall"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+            %1 = cast %0 : !transform.any_op to !transform.op<"scf.forall">
             %2 = share_forall_operands %1 share_operands = [0] : (!transform.op<"scf.forall">) -> !transform.op<"scf.forall">
           }
         }
@@ -1134,7 +1087,7 @@ class TestTiling:
 
                 # Bufferization
                 apply_patterns(variant_op, canonicalization=True, cse=True, licm=True)
-                variant_op_2 = bufferize(variant_op)
+                bufferize(variant_op)
 
             @sequence
             def final(variant_op, *extra_args):
@@ -1181,7 +1134,7 @@ class TestTiling:
                     tiling_canonicalization=True,
                     cse=True,
                 )
-                variant_op_3 = bufferize(variant_op)
+                bufferize(variant_op)
 
         module = self.backend.compile(
             module,
@@ -1215,14 +1168,14 @@ class TestTiling:
                   } -> !out_tensor_t
               return %2 : !out_tensor_t
             }
-            
+
             transform.sequence failures(propagate) attributes {transform.target_tag = "basic"} {
-            ^bb1(%variant_op: !pdl.operation):
-              %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+            ^bb1(%variant_op: !transform.any_op):
+              %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!transform.any_op) -> !transform.any_op
 
               // Step 1. Split the reduction to get meatier (size(red) / 2)-way parallelism.
               // ===========================================================================
-              %0 = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!pdl.operation) -> !pdl.operation
+              %0 = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!transform.any_op) -> !transform.any_op
               %init_or_alloc_op, %more_parallel_fill_op, %more_parallel_op, %combiner_op =
                 transform.structured.split_reduction %0
                   { split_factor = 2, insert_split_dimension = 1 }
@@ -1232,83 +1185,83 @@ class TestTiling:
               %forall_grid, %grid_combiner_op =
                 transform.structured.tile_to_forall_op %combiner_op tile_sizes [1]
                   ( mapping = [#gpu.block<x>] )
-              %not_combiner = transform.merge_handles %fill, %more_parallel_fill_op, %more_parallel_op : !pdl.operation
+              %not_combiner = transform.merge_handles %fill, %more_parallel_fill_op, %more_parallel_op : !transform.any_op
               transform.structured.fuse_into_containing_op %not_combiner into %forall_grid
 
               // Step 3. Second level of tiling + fusion parallelizes to threads.
               // ===========================================================================
-              %fill_1d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1xf32> in %variant_op 
-                : (!pdl.operation) -> !pdl.operation
+              %fill_1d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1xf32> in %variant_op
+                : (!transform.any_op) -> !transform.any_op
               %forall_block_combiner_op, %block_combiner_op =
-                transform.structured.tile_to_forall_op %grid_combiner_op tile_sizes [1] 
+                transform.structured.tile_to_forall_op %grid_combiner_op tile_sizes [1]
                 ( mapping = [#gpu.thread<z>] )
               transform.structured.fuse_into_containing_op %fill_1d into %forall_block_combiner_op
 
               // Canonicalizations.
               transform.apply_patterns %variant_op
-                { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
+                { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
 
-              %fill_2d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1x2xf32> in %variant_op 
-                : (!pdl.operation) -> !pdl.operation
+              %fill_2d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1x2xf32> in %variant_op
+                : (!transform.any_op) -> !transform.any_op
               %grid_more_parallel_op = transform.structured.match ops{["linalg.generic"]}
-                attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op 
-                  : (!pdl.operation) -> !pdl.operation
+                attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op
+                  : (!transform.any_op) -> !transform.any_op
               %forall_block_more_parallel_op, %block_more_parallel_op =
-                transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1] 
+                transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1]
                 ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
               transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op
 
               // Step 4. Rank-reduce and vectorize.
               // ===========================================================================
-              %func = transform.structured.match ops{["func.func"]} in %variant_op 
-                : (!pdl.operation) -> !pdl.operation
-              transform.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!pdl.operation) -> ()
+              %func = transform.structured.match ops{["func.func"]} in %variant_op
+                : (!transform.any_op) -> !transform.any_op
+              transform.apply_patterns %func {  rank_reducing_linalg, rank_reducing_vector } : (!transform.any_op) -> ()
               %func_3 = transform.structured.vectorize %func
 
               // Step 5. Bufferize and drop HAL decriptor from memref ops.
               // ===========================================================================
-              transform.apply_patterns %func_3 { fold_reassociative_reshapes } : (!pdl.operation) -> ()
-              transform.eliminate_empty_tensors %variant_op : (!pdl.operation) -> ()
-              %variant_op_3 = transform.bufferize { target_gpu } %variant_op : (!pdl.operation) -> !pdl.operation
+              transform.apply_patterns %func_3 { fold_reassociative_reshapes } : (!transform.any_op) -> ()
+              transform.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
+              %variant_op_3 = transform.bufferize { target_gpu } %variant_op : (!transform.any_op) -> !transform.any_op
 
               // Step 6. Post-bufferization mapping to blocks and threads.
               // ===========================================================================
               %func_4 = transform.structured.match ops{["func.func"]} in %variant_op_3
-                : (!pdl.operation) -> !pdl.operation
+                : (!transform.any_op) -> !transform.any_op
               %gpu_launch = transform.gpu.map_forall_to_blocks %func_4
                 grid_dims = [2] {generate_gpu_launch}
-              transform.gpu.map_nested_forall_to_threads %gpu_launch 
+              transform.gpu.map_nested_forall_to_threads %gpu_launch
                 block_dims = [32, 2, 1]
 
               %func_5 = transform.structured.match ops{["func.func"]} in %variant_op_3
-                : (!pdl.operation) -> !pdl.operation
-              transform.apply_patterns %func_5 { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases, cse, canonicalize } : (!pdl.operation) -> ()
+                : (!transform.any_op) -> !transform.any_op
+              transform.apply_patterns %func_5 { rank_reducing_linalg, rank_reducing_vector, fold_memref_aliases, cse, canonicalize } : (!transform.any_op) -> ()
             }
-            
+
             transform.sequence failures(propagate) attributes {transform.target_tag = "final"} {
-            ^bb1(%variant_op: !pdl.operation):
-              %if_op = transform.structured.match ops{["scf.if"]} in %variant_op 
-                : (!pdl.operation) -> !pdl.operation
+            ^bb1(%variant_op: !transform.any_op):
+              %if_op = transform.structured.match ops{["scf.if"]} in %variant_op
+                : (!transform.any_op) -> !transform.any_op
               transform.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
               %func_5 = transform.structured.match ops{["func.func"]} in %variant_op
-                : (!pdl.operation) -> !pdl.operation
-              transform.vector.warp_distribute %func_5 : (!pdl.operation) -> ()
+                : (!transform.any_op) -> !transform.any_op
+              transform.vector.warp_distribute %func_5 : (!transform.any_op) -> ()
               transform.apply_patterns %variant_op
-                { canonicalization, tiling_canonicalization, licm, cse } : (!pdl.operation) -> ()
-                
+                { canonicalization, tiling_canonicalization, licm, cse } : (!transform.any_op) -> ()
+
               // Hoist static allocs to allow multi-buffering to proceed.
-              transform.hoist_static_alloc %func_5 : (!pdl.operation) -> ()
+              transform.hoist_static_alloc %func_5 : (!transform.any_op) -> ()
               %allocs = transform.structured.match ops{["memref.alloc"]} in %func_5
-                : (!pdl.operation) -> !transform.op<"memref.alloc">
-              %mb_allocs = transform.memref.multibuffer %allocs {factor = 5 : i64, skip_analysis } 
-                : (!transform.op<"memref.alloc">) -> !pdl.operation
-              transform.apply_patterns %func_5 { canonicalization, cse, licm, fold_memref_aliases, tiling_canonicalization } : (!pdl.operation) -> ()
-                
+                : (!transform.any_op) -> !transform.op<"memref.alloc">
+              %mb_allocs = transform.memref.multibuffer %allocs {factor = 5 : i64, skip_analysis }
+                : (!transform.op<"memref.alloc">) -> !transform.any_op
+              transform.apply_patterns %func_5 { canonicalization, cse, licm, fold_memref_aliases, tiling_canonicalization } : (!transform.any_op) -> ()
+
               // Step 5. Lower vectors.
               // ============================================================================
               transform.vector.lower_vectors %func_5 multireduction_lowering = "innerreduction"
-                // Late canonicalizations and cleanups.
-              
+              // Late canonicalizations and cleanups.
+
             }
         """
         )

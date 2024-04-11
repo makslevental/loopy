@@ -2007,11 +2007,6 @@ class TransformDialectVisitor(DialectVisitor):
     def visit_ForeachOp(self, op: transform.ForeachOp):
         pass
 
-    def visit_GetClosestIsolatedParentOp(
-        self, op: transform.GetClosestIsolatedParentOp
-    ):
-        pass
-
     def visit_GetConsumersOfResult(self, op: transform.GetConsumersOfResult):
         pass
 
@@ -2027,9 +2022,6 @@ class TransformDialectVisitor(DialectVisitor):
     def visit_MergeHandlesOp(self, op: transform.MergeHandlesOp):
         pass
 
-    def visit_PDLMatchOp(self, op: transform.PDLMatchOp):
-        pass
-
     def visit_PrintOp(self, op: transform.PrintOp):
         pass
 
@@ -2037,12 +2029,6 @@ class TransformDialectVisitor(DialectVisitor):
         pass
 
     def visit_SequenceOp(self, op: transform.SequenceOp):
-        pass
-
-    def visit_SplitHandlesOp(self, op: transform.SplitHandlesOp):
-        pass
-
-    def visit_WithPDLPatternsOp(self, op: transform.WithPDLPatternsOp):
         pass
 
     def visit_YieldOp(self, op: transform.YieldOp):

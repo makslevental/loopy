@@ -2,26 +2,18 @@ name: Build
 
 on:
   workflow_dispatch:
-    branches:
-      - main
 
 jobs:
 
   build:
-    
+
     runs-on: ${{ matrix.os }}
+    continue-on-error: true
 
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
-        arch: [ x86_64 ]
-        python_version: [ "3.10", "3.11" ]
-        exclude:
-          - os: macos-latest
-            python_version: 3.9
-          - os: macos-latest
-            python_version: 3.10
+        os: [ ubuntu-latest, macos-11, windows-2020 ]
 
     steps:
       - name: Checkout
@@ -30,45 +22,22 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python_version }}
-
-      - name: Install CUDA
-        if: contains(matrix.os, 'ubuntu')
-        run: |
-          sudo apt install -y build-essential kmod
-          
-          wget -q https://developer.download.nvidia.com/compute/cuda/11.7.1/local_installers/cuda_11.7.1_515.65.01_linux.run
-          sudo sh cuda_11.7.1_515.65.01_linux.run --silent
-          if [[ $? -ne 0 ]]; then
-              echo "CUDA Installation Error."
-              exit 1
-          fi
-          
-          CUDA_PATH=/usr/local/cuda
-          echo "CUDA_PATH=${CUDA_PATH}"
-          export CUDA_PATH=${CUDA_PATH}
-          export PATH="$CUDA_PATH/bin:$PATH"
-          export LD_LIBRARY_PATH="$CUDA_PATH/lib:$LD_LIBRARY_PATH"
-          export LD_LIBRARY_PATH="$CUDA_PATH/lib64:$LD_LIBRARY_PATH"
-          # Check nvcc is now available.
-          nvcc -V
-          # If executed on github actions, make the appropriate echo statements to update the environment
-          # Set paths for subsequent steps, using ${CUDA_PATH}
-          echo "Adding CUDA to CUDA_PATH, PATH and LD_LIBRARY_PATH"
-          echo "CUDA_PATH=${CUDA_PATH}" >> $GITHUB_ENV
-          echo "${CUDA_PATH}/bin" >> $GITHUB_PATH
-          echo "LD_LIBRARY_PATH=${CUDA_PATH}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=${CUDA_PATH}/lib64:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+          python-version: "3.11"
 
       - name: Build wheel
+        if: ${{ matrix.os != 'windows-2020' }}
+        shell: bash
         run: |
-          if [ x"${{ matrix.os }}" == x"ubuntu-latest" ]; then
-            CMAKE_GENERATOR=Ninja pip wheel . -w wheelhouse -v
-          else
-            pip install cibuildwheel
-            cibuildwheel --platform macos
-          fi
-          
+          pip install -r build-requirements.txt
+          export PARALLEL_LEVEL=2
+          cibuildwheel
+
+      - uses: pypa/cibuildwheel@v2.13.0
+        if: ${{ matrix.os == 'windows-2020' }}
+
+      - name: Copy wheel
+        shell: bash
+        run: |
           mkdir -p ${{ github.sha }}
           mv wheelhouse/nelli*.whl ${{ github.sha }}/
 

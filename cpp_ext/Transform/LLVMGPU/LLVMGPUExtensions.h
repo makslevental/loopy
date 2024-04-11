@@ -49,7 +49,6 @@ rewriteForallToGpu(scf::ForallOp forallOp,
                    const SmallVector<int64_t> &globalWorkgroupSizes,
                    RewriterBase &rewriter, bool syncAfterDistribute = true);
 
-
 class SimplePatternRewriter : public PatternRewriter {
 public:
   SimplePatternRewriter(MLIRContext *context) : PatternRewriter(context) {}

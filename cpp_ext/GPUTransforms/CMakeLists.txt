@@ -13,7 +13,7 @@ add_mlir_library(
   MLIRArithToSPIRV
   MLIRFuncDialect
   MLIRFuncToSPIRV
-  MLIRGPUOps
+  MLIRGPUDialect
   MLIRIR
   MLIRMemRefDialect
   MLIRPass

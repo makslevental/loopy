@@ -31,7 +31,6 @@
 #include "LoopUtils.h"
 #include "PDLByteCodeInterpreter/PDLByteCodeInterpreter.h"
 #include "Pybind.h"
-#include "RaiseToAffine/RaiseToAffine.h"
 #include "RefBackend/RefBackend.h"
 #include "TilingInterface/TilingInterface.h"
 #include "Transform/Structured/StructuredTransformOpsExt.h"
@@ -313,7 +312,6 @@ PYBIND11_MODULE(_nelli_mlir, m) {
   nelli::registerLinalgTransforms();
   nelli::registerMungeCallingConventionPass();
   nelli::registerMungeMemrefCopyPass();
-  nelli::registerRaiseSCFToAffinePass();
   nelli::registerSerializeSPIRVPass();
   nelli::registerSetSPIRVAbiAttributePass();
   nelli::registerSetSPIRVCapabilitiesPass();

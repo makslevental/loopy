@@ -8,10 +8,10 @@
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/IR/MLIRContext.h"
 
 namespace mlir {
 
@@ -48,9 +48,10 @@ void hoistStaticallyBoundAllocationsInFunc(RewriterBase &rewriter,
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes = {});
 
-Optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
-Optional<SmallVector<int64_t>> gpuMmaUnrollOrder(vector::ContractionOp contract);
-Optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);
+std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
+std::optional<SmallVector<int64_t>>
+gpuMmaUnrollOrder(vector::ContractionOp contract);
+std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);
 
 void addTransformPostBufferizationPasses(OpPassManager &passManager);
 } // namespace mlir
@@ -60,6 +61,5 @@ mlir::LogicalResult eliminateEmptyTensors(
     mlir::Operation *op,
     const mlir::bufferization::OneShotBufferizationOptions &options);
 }
-
 
 #endif // NELLI_UTIL_H

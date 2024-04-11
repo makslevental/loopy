@@ -89,7 +89,7 @@ struct InsertGPUAllocsPass
     // returns the reference to it.
 
     auto getMemReadWriteOp = [](mlir::Operation *op)
-        -> llvm::Optional<mlir::SmallVector<mlir::Value, 4>> {
+        -> std::optional<mlir::SmallVector<mlir::Value, 4>> {
       if (auto load = mlir::dyn_cast<mlir::memref::LoadOp>(op)) {
         return {{load.getMemref()}};
       } else if (auto store = mlir::dyn_cast<mlir::memref::StoreOp>(op)) {

@@ -29,7 +29,7 @@ class ApplyBufferOptimizationsOp(_ods_ir.OpView):
         return self.operation.operands[0]
 
 
-@cext.register_operation(_Dialect)
+# @cext.register_operation(_Dialect)
 @extend_opview_class(_ods_ext_module)
 class ApplyPatternsOp(_ods_ir.OpView):
     OPERATION_NAME = "transform.apply_patterns"

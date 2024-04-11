@@ -75,6 +75,7 @@ def mlir_gc():
 
 @contextlib.contextmanager
 def mlir_mod_ctx(src: Optional[str] = None):
+    mlir_gc()
     if src is not None:
         module = Module.parse(src)
     else:

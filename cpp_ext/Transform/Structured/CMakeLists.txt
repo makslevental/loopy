@@ -16,7 +16,7 @@ add_mlir_library(
   MLIRArithUtils
   MLIRBufferizationDialect
   MLIRBufferizationTransforms
-  MLIRGPUOps
+  MLIRGPUDialect
   MLIRIR
   MLIRLinalgDialect
   MLIRLinalgTransformOps

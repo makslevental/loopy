@@ -8,8 +8,6 @@
 #include "Transform/ListenerCSE.h"
 #include "Util.h"
 
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -21,20 +19,22 @@
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
-#include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
-#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
 using namespace mlir::affine;
@@ -46,10 +46,8 @@ transform::CommonExtensions::CommonExtensions() {
       >();
 }
 
-void mlir::registerTransformDialectCommonExtension(
-    DialectRegistry &registry) {
-  registry.addExtensions<
-      mlir::transform::CommonExtensions>();
+void mlir::registerTransformDialectCommonExtension(DialectRegistry &registry) {
+  registry.addExtensions<mlir::transform::CommonExtensions>();
 }
 
 void mlir::registerTransformDialectCommonExtension(MLIRContext &context) {
@@ -95,8 +93,7 @@ static void eraseDeadAllocAndStores(Operation *parentOp) {
 //===---------------------------------------------------------------------===//
 // ApplyBufferOptimizationsOp
 //===---------------------------------------------------------------------===//
-DiagnosedSilenceableFailure
-transform::ApplyBufferOptimizationsOp::applyToOne(
+DiagnosedSilenceableFailure transform::ApplyBufferOptimizationsOp::applyToOne(
     Operation *target, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   // Apply store to load forwarding and dead store elimination.
@@ -113,8 +110,9 @@ void transform::ApplyBufferOptimizationsOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
-void transform::ApplyBufferOptimizationsOp::build(
-    OpBuilder &builder, OperationState &result, Value target) {
+void transform::ApplyBufferOptimizationsOp::build(OpBuilder &builder,
+                                                  OperationState &result,
+                                                  Value target) {
   result.addOperands(target);
 }
 
@@ -128,8 +126,8 @@ void transform::ApplyPatternsOp::build(
 
   auto unitAttr = builder.getUnitAttr();
 
-#define ADD_PATTERN(NAME, ATTR) \
-  if (patterns.NAME)            \
+#define ADD_PATTERN(NAME, ATTR)                                                \
+  if (patterns.NAME)                                                           \
     result.addAttribute(ApplyPatternsOp::ATTR(result.name), unitAttr);
   ///
   /// When touching something here, do not forget to update CommonExtensions.h.
@@ -167,7 +165,8 @@ void transform::ApplyPatternsOp::build(
 }
 
 static void addOperands(Operation *op, SetVector<Value> &operandSet) {
-  if (!op) return;
+  if (!op)
+    return;
   TypeSwitch<Operation *, void>(op)
       .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
         SmallVector<Value> inputOperands{linalgOp.getDpsInputOperands()};
@@ -181,10 +180,12 @@ static void addOperands(Operation *op, SetVector<Value> &operandSet) {
 template <int limit = 3>
 static bool setFusedOpOperandLimit(OpOperand *fusedOperand) {
   Operation *producer = fusedOperand->get().getDefiningOp();
-  if (!producer) return false;
+  if (!producer)
+    return false;
   Operation *consumer = fusedOperand->getOwner();
   SetVector<Value> fusedOpOperands;
-  if (producer->getNumResults() != 1) return false;
+  if (producer->getNumResults() != 1)
+    return false;
   addOperands(consumer, fusedOpOperands);
   fusedOpOperands.remove(producer->getResult(0));
   addOperands(producer, fusedOpOperands);
@@ -199,13 +200,16 @@ struct GenerateToConstant : public OpRewritePattern<tensor::GenerateOp> {
   LogicalResult matchAndRewrite(tensor::GenerateOp generateOp,
                                 PatternRewriter &rewriter) const final {
     auto tensorType = generateOp.getResult().getType().cast<RankedTensorType>();
-    if (!tensorType.hasStaticShape()) return failure();
+    if (!tensorType.hasStaticShape())
+      return failure();
     auto terminatorOp =
         cast<tensor::YieldOp>(generateOp.getBody().front().getTerminator());
-    if (terminatorOp->getNumOperands() > 1) return failure();
+    if (terminatorOp->getNumOperands() > 1)
+      return failure();
     auto constantOp =
         terminatorOp->getOperand(0).getDefiningOp<arith::ConstantOp>();
-    if (!constantOp) return failure();
+    if (!constantOp)
+      return failure();
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(
         generateOp, tensorType,
         DenseElementsAttr::get(tensorType, constantOp.getValueAttr()));
@@ -230,10 +234,10 @@ struct FoldTensorEmptyExtract
     return success();
   }
 };
-}  // namespace
+} // namespace
 
-static void addLowerTransferOpPermutationsPatterns(
-    RewritePatternSet &patterns) {
+static void
+addLowerTransferOpPermutationsPatterns(RewritePatternSet &patterns) {
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
 }
 
@@ -253,21 +257,21 @@ static void addReassociativeReshapePatterns(RewritePatternSet &patterns) {
   tensor::populateReassociativeReshapeFoldingPatterns(patterns);
 }
 
-static void addEraseUnnecessaryTensorOperandsPatterns(
-    RewritePatternSet &patterns) {
+static void
+addEraseUnnecessaryTensorOperandsPatterns(RewritePatternSet &patterns) {
   linalg::populateEraseUnnecessaryInputsPatterns(patterns);
 }
 
 static void addRankReducingLinalgPatterns(RewritePatternSet &patterns) {
   // depends on IREE::HAL::InterfaceBindingSubspanOp
-//  populateReshapeToInterfaceTensorPatterns(patterns);
+  //  populateReshapeToInterfaceTensorPatterns(patterns);
   linalg::populateFoldUnitExtentDimsViaSlicesPatterns(patterns);
 }
 
-static void addRankReducingLinalgViaReshapesPatterns(
-    RewritePatternSet &patterns) {
+static void
+addRankReducingLinalgViaReshapesPatterns(RewritePatternSet &patterns) {
   // depends on IREE::HAL::InterfaceBindingSubspanOp
-//  populateReshapeToInterfaceTensorPatterns(patterns);
+  //  populateReshapeToInterfaceTensorPatterns(patterns);
   linalg::populateFoldUnitExtentDimsViaReshapesPatterns(patterns);
 }
 
@@ -279,7 +283,7 @@ static void addSwappingPatterns(RewritePatternSet &patterns,
                                 bool swapPaddingElideCornerCase) {
   patterns.add<linalg::ExtractSliceOfPadTensorSwapPattern>(
       patterns.getContext(),
-      [&](tensor::ExtractSliceOp) -> llvm::Optional<bool> {
+      [&](tensor::ExtractSliceOp) -> std::optional<bool> {
         return !swapPaddingElideCornerCase;
       });
 }
@@ -289,15 +293,16 @@ static void addTilingCanonicalizationPatterns(RewritePatternSet &patterns) {
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
 }
 
-static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeMmaSyncVectorSize(
-    Operation *op) {
+static std::optional<SmallVector<int64_t>>
+getGPUTensorCoreNativeMmaSyncVectorSize(Operation *op) {
   return mlir::getMmaNativeVectorSize(op);
 }
 
 static void addUnrollVectorsGpuMmaSyncPatterns(RewritePatternSet &patterns) {
-  auto unrollOrder = [](Operation *op) -> Optional<SmallVector<int64_t>> {
+  auto unrollOrder = [](Operation *op) -> std::optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
-    if (!contract) return std::nullopt;
+    if (!contract)
+      return std::nullopt;
     return mlir::gpuMmaUnrollOrder(contract);
   };
   vector::populateVectorUnrollPatterns(
@@ -306,15 +311,16 @@ static void addUnrollVectorsGpuMmaSyncPatterns(RewritePatternSet &patterns) {
                     .setUnrollTraversalOrderFn(unrollOrder));
 }
 
-static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeWmmaVectorSize(
-    Operation *op) {
+static std::optional<SmallVector<int64_t>>
+getGPUTensorCoreNativeWmmaVectorSize(Operation *op) {
   return getWmmaNativeVectorSize(op);
 }
 
 static void addUnrollVectorsGpuWmmaPatterns(RewritePatternSet &patterns) {
-  auto unrollOrder = [](Operation *op) -> Optional<SmallVector<int64_t>> {
+  auto unrollOrder = [](Operation *op) -> std::optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
-    if (!contract) return std::nullopt;
+    if (!contract)
+      return std::nullopt;
     return mlir::gpuMmaUnrollOrder(contract);
   };
   vector::populateVectorUnrollPatterns(
@@ -327,8 +333,8 @@ static void addAdditionalPatterns(RewritePatternSet &patterns) {
   patterns.add<GenerateToConstant>(patterns.getContext());
 }
 
-static void addAllRegisteredCanonicalizationPatterns(
-    RewritePatternSet &patterns) {
+static void
+addAllRegisteredCanonicalizationPatterns(RewritePatternSet &patterns) {
   MLIRContext *ctx = patterns.getContext();
   for (Dialect *dialect : ctx->getLoadedDialects())
     dialect->getCanonicalizationPatterns(patterns);
@@ -347,7 +353,8 @@ DiagnosedSilenceableFailure transform::ApplyPatternsOp::applyToOne(
   }
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
-  if (getAdditionalPatterns()) addAdditionalPatterns(patterns);
+  if (getAdditionalPatterns())
+    addAdditionalPatterns(patterns);
   if (getBubbleCollapse()) {
     linalg::populateFoldReshapeOpsByCollapsingPatterns(
         patterns, [](OpOperand *) { return true; });
@@ -358,30 +365,39 @@ DiagnosedSilenceableFailure transform::ApplyPatternsOp::applyToOne(
   }
   if (getBubblePackUnPack())
     linalg::populateDataLayoutPropagationPatterns(patterns, nullptr);
-  if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
+  if (getCanonicalization())
+    addAllRegisteredCanonicalizationPatterns(patterns);
   if (getEraseUnnecessaryTensorOperands())
     addEraseUnnecessaryTensorOperandsPatterns(patterns);
   if (getExpandMemrefStridedMetadata())
     memref::populateExpandStridedMetadataPatterns(patterns);
-  if (getFoldMemrefAliases()) addFoldMemrefAliasPatterns(patterns);
-  if (getFoldReassociativeReshapes()) addReassociativeReshapePatterns(patterns);
-  if (getFoldTensorEmptyExtract()) addFoldTensorEmptyExtract(patterns);
+  if (getFoldMemrefAliases())
+    addFoldMemrefAliasPatterns(patterns);
+  if (getFoldReassociativeReshapes())
+    addReassociativeReshapePatterns(patterns);
+  if (getFoldTensorEmptyExtract())
+    addFoldTensorEmptyExtract(patterns);
   if (getLinalgElementwiseGreedyFusion())
     linalg::populateElementwiseOpsFusionPatterns(patterns,
                                                  setFusedOpOperandLimit<3>);
   if (getLowerTransferOpPermutations())
     addLowerTransferOpPermutationsPatterns(patterns);
-  if (getLowerVectorMasks()) addLowerVectorMasksPatterns(patterns);
-  if (getRankReducingLinalg()) addRankReducingLinalgPatterns(patterns);
+  if (getLowerVectorMasks())
+    addLowerVectorMasksPatterns(patterns);
+  if (getRankReducingLinalg())
+    addRankReducingLinalgPatterns(patterns);
   if (getRankReducingLinalgViaReshapes())
     addRankReducingLinalgViaReshapesPatterns(patterns);
-  if (getRankReducingVector()) addRankReducingVectorPatterns(patterns);
+  if (getRankReducingVector())
+    addRankReducingVectorPatterns(patterns);
   if (getSwappingPatterns())
     addSwappingPatterns(patterns, getSwapPaddingElideConditional());
-  if (getTilingCanonicalization()) addTilingCanonicalizationPatterns(patterns);
+  if (getTilingCanonicalization())
+    addTilingCanonicalizationPatterns(patterns);
   if (getUnrollVectorsGpuMmaSync())
     addUnrollVectorsGpuMmaSyncPatterns(patterns);
-  if (getUnrollVectorsGpuWmma()) addUnrollVectorsGpuWmmaPatterns(patterns);
+  if (getUnrollVectorsGpuWmma())
+    addUnrollVectorsGpuWmmaPatterns(patterns);
 
   TrackingListener listener(state);
   GreedyRewriteConfig config;
@@ -390,7 +406,8 @@ DiagnosedSilenceableFailure transform::ApplyPatternsOp::applyToOne(
   // overloads only accepts ops that are isolated from above.
   SmallVector<Operation *> ops;
   target->walk([&](Operation *nestedOp) {
-    if (target != nestedOp) ops.push_back(nestedOp);
+    if (target != nestedOp)
+      ops.push_back(nestedOp);
   });
   LogicalResult result =
       applyOpPatternsAndFold(ops, std::move(patterns), config);
@@ -429,9 +446,11 @@ DiagnosedSilenceableFailure transform::ApplyPatternsOp::applyToOne(
       lastFuncVisited = funcOp;
       result =
           eliminateCommonSubexpressions(funcOp, /*domInfo=*/nullptr, &listener);
-      if (failed(result)) return WalkResult::interrupt();
+      if (failed(result))
+        return WalkResult::interrupt();
       listenerResult = listener.checkErrorState();
-      if (failed(listenerResult)) return WalkResult::interrupt();
+      if (failed(listenerResult))
+        return WalkResult::interrupt();
       return WalkResult::advance();
     });
     if (walkResult.wasInterrupted()) {
@@ -463,8 +482,8 @@ DiagnosedSilenceableFailure transform::HoistStaticAllocOp::applyToOne(
     func::FuncOp funcOp, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   IRRewriter rewriter(funcOp->getContext());
-  mlir::hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
-      rewriter, funcOp);
+  mlir::hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(rewriter,
+                                                               funcOp);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -478,8 +497,7 @@ void transform::HoistStaticAllocOp::getEffects(
 // ShareForallOperandsOp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform::ShareForallOperandsOp::applyToOne(
+DiagnosedSilenceableFailure transform::ShareForallOperandsOp::applyToOne(
     scf::ForallOp forallOp, transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   IRRewriter rewriter(getContext());
@@ -504,7 +522,8 @@ transform::ShareForallOperandsOp::applyToOne(
     tensor::ExtractSliceOp extractSliceOp;
     for (Operation *user : toShare.getUsers()) {
       extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user);
-      if (extractSliceOp) break;
+      if (extractSliceOp)
+        break;
     }
     if (!extractSliceOp) {
       /*return mlir::emitSilenceableFailure(
@@ -519,8 +538,10 @@ transform::ShareForallOperandsOp::applyToOne(
     // (i.e., same source/target, offsets, sizes and strides).
     auto isMatchingParallelInsertSlice = [&](Operation &op) {
       auto insertSlice = dyn_cast<tensor::ParallelInsertSliceOp>(&op);
-      if (!insertSlice) return false;
-      if (insertSlice.getDest() != bbArg) return false;
+      if (!insertSlice)
+        return false;
+      if (insertSlice.getDest() != bbArg)
+        return false;
       return llvm::equal(insertSlice.getMixedOffsets(),
                          extractSliceOp.getMixedOffsets()) &&
              llvm::equal(insertSlice.getMixedSizes(),
@@ -551,294 +572,301 @@ transform::ShareForallOperandsOp::applyToOne(
 /// For now, this only supports constant index ops and empty workload
 /// operands. Assumes the HAL::ExecutableExportOp is built with an empty
 /// region.
-//static LogicalResult populateWorkgroupCountComputingRegion(
-//    PatternRewriter &rewriter, scf::ForallOp forallOp,
-//    HAL::ExecutableExportOp exportOp) {
-//  Location loc = forallOp.getLoc();
-//  OpBuilder::InsertionGuard g(rewriter);
-//  Region &r = exportOp.getWorkgroupCount();
-//  assert(r.empty() && "expected block-less workgroup_count region");
-//  Block *block = rewriter.createBlock(&r);
-//  // The HAL::DeviceType argument is always the first argument.
-//  block->addArgument(HAL::DeviceType::get(rewriter.getContext()), loc);
-//  rewriter.setInsertionPointToStart(block);
+// static LogicalResult populateWorkgroupCountComputingRegion(
+//     PatternRewriter &rewriter, scf::ForallOp forallOp,
+//     HAL::ExecutableExportOp exportOp) {
+//   Location loc = forallOp.getLoc();
+//   OpBuilder::InsertionGuard g(rewriter);
+//   Region &r = exportOp.getWorkgroupCount();
+//   assert(r.empty() && "expected block-less workgroup_count region");
+//   Block *block = rewriter.createBlock(&r);
+//   // The HAL::DeviceType argument is always the first argument.
+//   block->addArgument(HAL::DeviceType::get(rewriter.getContext()), loc);
+//   rewriter.setInsertionPointToStart(block);
 //
-//  SmallVector<Value> results;
-//  // For now, this assumes that we only pull in constants.
-//  // TODO: Iteratively pull required operations.
-//  for (Value v : forallOp.getUpperBound(rewriter)) {
-//    auto op = dyn_cast_or_null<arith::ConstantIndexOp>(v.getDefiningOp());
-//    if (!op) return failure();
-//    results.push_back(
-//        cast<arith::ConstantIndexOp>(rewriter.clone(*op)).getResult());
-//  }
-//  // Pad to `3` to match assumptions hardcoded in IREE.
-//  for (unsigned i = results.size(); i < 3; ++i) {
-//    results.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 1));
-//  }
-//  rewriter.create<HAL::ReturnOp>(loc, results);
+//   SmallVector<Value> results;
+//   // For now, this assumes that we only pull in constants.
+//   // TODO: Iteratively pull required operations.
+//   for (Value v : forallOp.getUpperBound(rewriter)) {
+//     auto op = dyn_cast_or_null<arith::ConstantIndexOp>(v.getDefiningOp());
+//     if (!op) return failure();
+//     results.push_back(
+//         cast<arith::ConstantIndexOp>(rewriter.clone(*op)).getResult());
+//   }
+//   // Pad to `3` to match assumptions hardcoded in IREE.
+//   for (unsigned i = results.size(); i < 3; ++i) {
+//     results.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 1));
+//   }
+//   rewriter.create<HAL::ReturnOp>(loc, results);
 //
-//  return success();
-//}
+//   return success();
+// }
 
 //===---------------------------------------------------------------------===//
 // Patterns for ForallToWorkgroup rewrite.
 //===---------------------------------------------------------------------===//
 
-//LogicalResult rewriteForallToWorkgroup(scf::ForallOp forallOp,
-//                                       IREE::HAL::ExecutableExportOp exportOp,
-//                                       PatternRewriter &rewriter) {
-//  // Step 0. Target-specific verifications. There is no good place to anchor
-//  // those right now: the ForallOp is target-independent and the
-//  // transform op does not apply to individual ForallOp.
-//  MLIRContext *ctx = forallOp->getContext();
-//  Location loc = forallOp->getLoc();
-//  // TODO iree should have own device mapping like #hal.workgroup<x/y/z>
-//  Attribute bX = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimX);
-//  Attribute bY = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimY);
-//  Attribute bZ = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimZ);
-//  if (forallOp.getNumResults() > 0)
-//    return forallOp->emitError(
-//        "only bufferized scf.forall lowers to workgroup");
-//  if (forallOp.getRank() > 3)
-//    return forallOp->emitError(
-//        "scf.forall with rank > 3 does not lower to workgroup");
+// LogicalResult rewriteForallToWorkgroup(scf::ForallOp forallOp,
+//                                        IREE::HAL::ExecutableExportOp
+//                                        exportOp, PatternRewriter &rewriter) {
+//   // Step 0. Target-specific verifications. There is no good place to anchor
+//   // those right now: the ForallOp is target-independent and the
+//   // transform op does not apply to individual ForallOp.
+//   MLIRContext *ctx = forallOp->getContext();
+//   Location loc = forallOp->getLoc();
+//   // TODO iree should have own device mapping like #hal.workgroup<x/y/z>
+//   Attribute bX = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimX);
+//   Attribute bY = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimY);
+//   Attribute bZ = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimZ);
+//   if (forallOp.getNumResults() > 0)
+//     return forallOp->emitError(
+//         "only bufferized scf.forall lowers to workgroup");
+//   if (forallOp.getRank() > 3)
+//     return forallOp->emitError(
+//         "scf.forall with rank > 3 does not lower to workgroup");
 //
-//  if (!forallOp.getMapping().has_value())
-//    return forallOp->emitError("mapping must be present");
-//  SmallVector<Attribute> blockMapping =
-//      llvm::to_vector(forallOp.getMapping()->getValue());
-//  if (llvm::any_of(blockMapping, [](DeviceMappingAttrInterface map) {
-//        return !map.isa<gpu::GPUBlockMappingAttr>();
-//      })) {
-//    return forallOp->emitError("mapping must be #gpu.block<x/y/z/>");
-//  }
+//   if (!forallOp.getMapping().has_value())
+//     return forallOp->emitError("mapping must be present");
+//   SmallVector<Attribute> blockMapping =
+//       llvm::to_vector(forallOp.getMapping()->getValue());
+//   if (llvm::any_of(blockMapping, [](DeviceMappingAttrInterface map) {
+//         return !map.isa<gpu::GPUBlockMappingAttr>();
+//       })) {
+//     return forallOp->emitError("mapping must be #gpu.block<x/y/z/>");
+//   }
 //
-//  // Step 1. Complete the blockMapping to a full mapping (with 1s) if
-//  // necessary.
-//  SmallVector<Value> numBlocks =
-//      llvm::to_vector(forallOp.getUpperBound(rewriter));
-//  // Ensure we have 3 block sizes, one for each id.
-//  Value one;
-//  for (auto attr : {bX, bY, bZ}) {
-//    if (!llvm::is_contained(blockMapping, attr)) {
-//      blockMapping.push_back(attr);
-//      one = one ? one : rewriter.create<arith::ConstantIndexOp>(loc, 1);
-//      numBlocks.push_back(one);
-//    }
-//  }
-//  // Step 2. sort the values by the corresponding GPUBlockMappingAttr.
-//  auto comparator = [](Attribute a, Attribute b) -> bool {
-//    return static_cast<int64_t>(a.cast<gpu::GPUBlockMappingAttr>().getBlock()) <
-//           static_cast<int64_t>(b.cast<gpu::GPUBlockMappingAttr>().getBlock());
-//  };
-//  SmallVector<Value> gridDimValues =
-//      scf::ForallOp::getValuesSortedByKey(blockMapping, numBlocks, comparator);
+//   // Step 1. Complete the blockMapping to a full mapping (with 1s) if
+//   // necessary.
+//   SmallVector<Value> numBlocks =
+//       llvm::to_vector(forallOp.getUpperBound(rewriter));
+//   // Ensure we have 3 block sizes, one for each id.
+//   Value one;
+//   for (auto attr : {bX, bY, bZ}) {
+//     if (!llvm::is_contained(blockMapping, attr)) {
+//       blockMapping.push_back(attr);
+//       one = one ? one : rewriter.create<arith::ConstantIndexOp>(loc, 1);
+//       numBlocks.push_back(one);
+//     }
+//   }
+//   // Step 2. sort the values by the corresponding GPUBlockMappingAttr.
+//   auto comparator = [](Attribute a, Attribute b) -> bool {
+//     return
+//     static_cast<int64_t>(a.cast<gpu::GPUBlockMappingAttr>().getBlock()) <
+//            static_cast<int64_t>(b.cast<gpu::GPUBlockMappingAttr>().getBlock());
+//   };
+//   SmallVector<Value> gridDimValues =
+//       scf::ForallOp::getValuesSortedByKey(blockMapping, numBlocks,
+//       comparator);
 //
-//  // Step 3. Outline the compute workload region and set up the workload
-//  // operands, if this has not been done already.
-//  // Using `transform.iree.tile_to_forall_and_workgroup_count_region` is
-//  // the preferred way to set up tiling and workgroup_count region **at the
-//  // same time**.
-//  //
-//  // The block of code below will be retired once there is enough confidence
-//  // we can do everything without it. This includes in particular providing
-//  // custom fusion heuristics at the flow level: at this time, the only way to
-//  // fully control fusion of more advanced cases is to use the transform
-//  // dialect at the flow level and explicitly match the ops we want to fuse.
-//  // Once fusion is customizable enough in perpetuity, we can retire this.
-//  if (exportOp.getWorkgroupCount().empty()) {
-//    if (llvm::any_of(forallOp.getUpperBound(rewriter), [](Value v) {
-//          return !v.getDefiningOp<arith::ConstantIndexOp>();
-//        })) {
-//      return forallOp->emitError(
-//          "unsupported dynamic workgroup_count atm --- need to slice out "
-//          "workgroup_count computation into "
-//          "ExecutableExport::workgroup_count."
-//          "\nThis region may require arbitrary computations and cannot "
-//          "magically match what the `stream.cmd.dispatch` has already "
-//          "imposed "
-//          "on us at a distance."
-//          "\nFor now we must specify the number of values properly when "
-//          "applying the topLevel tile_to_forall_op");
-//    }
-//    if (failed(populateWorkgroupCountComputingRegion(rewriter, forallOp,
-//                                                     exportOp))) {
-//      return forallOp->emitOpError(
-//                 "failed to populate workload region for dispatchOp: ")
-//             << exportOp;
-//    }
-//  }
+//   // Step 3. Outline the compute workload region and set up the workload
+//   // operands, if this has not been done already.
+//   // Using `transform.iree.tile_to_forall_and_workgroup_count_region` is
+//   // the preferred way to set up tiling and workgroup_count region **at the
+//   // same time**.
+//   //
+//   // The block of code below will be retired once there is enough confidence
+//   // we can do everything without it. This includes in particular providing
+//   // custom fusion heuristics at the flow level: at this time, the only way
+//   to
+//   // fully control fusion of more advanced cases is to use the transform
+//   // dialect at the flow level and explicitly match the ops we want to fuse.
+//   // Once fusion is customizable enough in perpetuity, we can retire this.
+//   if (exportOp.getWorkgroupCount().empty()) {
+//     if (llvm::any_of(forallOp.getUpperBound(rewriter), [](Value v) {
+//           return !v.getDefiningOp<arith::ConstantIndexOp>();
+//         })) {
+//       return forallOp->emitError(
+//           "unsupported dynamic workgroup_count atm --- need to slice out "
+//           "workgroup_count computation into "
+//           "ExecutableExport::workgroup_count."
+//           "\nThis region may require arbitrary computations and cannot "
+//           "magically match what the `stream.cmd.dispatch` has already "
+//           "imposed "
+//           "on us at a distance."
+//           "\nFor now we must specify the number of values properly when "
+//           "applying the topLevel tile_to_forall_op");
+//     }
+//     if (failed(populateWorkgroupCountComputingRegion(rewriter, forallOp,
+//                                                      exportOp))) {
+//       return forallOp->emitOpError(
+//                  "failed to populate workload region for dispatchOp: ")
+//              << exportOp;
+//     }
+//   }
 //
-//  // Step 4. Create the workgroup id and count ops.
-//  IRMapping bvm;
-//  SmallVector<Value> workgroupIdOps, workgroupCountOps;
-//  for (Attribute attr : blockMapping) {
-//    auto idx =
-//        static_cast<int64_t>(attr.cast<gpu::GPUBlockMappingAttr>().getBlock());
-//    workgroupIdOps.push_back(
-//        rewriter.create<HAL::InterfaceWorkgroupIDOp>(loc, idx));
-//    workgroupCountOps.push_back(
-//        rewriter.create<HAL::InterfaceWorkgroupCountOp>(loc, idx));
-//  }
-//  bvm.map(forallOp.getInductionVars(), workgroupIdOps);
-//  bvm.map(forallOp.getUpperBound(rewriter), workgroupCountOps);
+//   // Step 4. Create the workgroup id and count ops.
+//   IRMapping bvm;
+//   SmallVector<Value> workgroupIdOps, workgroupCountOps;
+//   for (Attribute attr : blockMapping) {
+//     auto idx =
+//         static_cast<int64_t>(attr.cast<gpu::GPUBlockMappingAttr>().getBlock());
+//     workgroupIdOps.push_back(
+//         rewriter.create<HAL::InterfaceWorkgroupIDOp>(loc, idx));
+//     workgroupCountOps.push_back(
+//         rewriter.create<HAL::InterfaceWorkgroupCountOp>(loc, idx));
+//   }
+//   bvm.map(forallOp.getInductionVars(), workgroupIdOps);
+//   bvm.map(forallOp.getUpperBound(rewriter), workgroupCountOps);
 //
-//  // Step 5. Predicate omitted given unique topLevel scf::ForallOp.
+//   // Step 5. Predicate omitted given unique topLevel scf::ForallOp.
 //
-//  // Step 6. Move the body of forallOp.
-//  // Erase the terminator first, it will not be used since we are on buffers.
-//  rewriter.eraseOp(forallOp.getTerminator());
-//  Block *targetBlock;
-//  Block::iterator insertionPoint;
-//  targetBlock = forallOp->getBlock();
-//  insertionPoint = Block::iterator(forallOp);
-//  Block &sourceBlock = forallOp.getRegion().front();
-//  targetBlock->getOperations().splice(insertionPoint,
-//                                      sourceBlock.getOperations());
+//   // Step 6. Move the body of forallOp.
+//   // Erase the terminator first, it will not be used since we are on buffers.
+//   rewriter.eraseOp(forallOp.getTerminator());
+//   Block *targetBlock;
+//   Block::iterator insertionPoint;
+//   targetBlock = forallOp->getBlock();
+//   insertionPoint = Block::iterator(forallOp);
+//   Block &sourceBlock = forallOp.getRegion().front();
+//   targetBlock->getOperations().splice(insertionPoint,
+//                                       sourceBlock.getOperations());
 //
-//  // Step 7. RAUW thread indices to thread ops.
-//  for (Value blockIdx : forallOp.getInductionVars()) {
-//    for (Operation *user : llvm::make_early_inc_range(blockIdx.getUsers())) {
-//      rewriter.updateRootInPlace(user, [&]() {
-//        user->replaceUsesOfWith(blockIdx, bvm.lookup(blockIdx));
-//      });
-//    }
-//  }
+//   // Step 7. RAUW thread indices to thread ops.
+//   for (Value blockIdx : forallOp.getInductionVars()) {
+//     for (Operation *user : llvm::make_early_inc_range(blockIdx.getUsers())) {
+//       rewriter.updateRootInPlace(user, [&]() {
+//         user->replaceUsesOfWith(blockIdx, bvm.lookup(blockIdx));
+//       });
+//     }
+//   }
 //
-//  // Step 5. Barriers omitted given unique topLevel scf::ForallOp.
+//   // Step 5. Barriers omitted given unique topLevel scf::ForallOp.
 //
-//  // Step 6. Erase old op.
-//  rewriter.eraseOp(forallOp);
+//   // Step 6. Erase old op.
+//   rewriter.eraseOp(forallOp);
 //
-//  return success();
-//}
+//   return success();
+// }
 
 //===---------------------------------------------------------------------===//
 // IREE-specific transformations defined outside of iree_linalg_transform.
 //===---------------------------------------------------------------------===//
 
-//DiagnosedSilenceableFailure transform::ForallToWorkgroupOp::applyToOne(
-//    func::FuncOp target, transform::ApplyToEachResultList &results,
-//    transform::TransformState &state) {
-//  if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
-//    return mlir::emitDefiniteFailure(
-//        state.getTopLevel(),
-//        "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel "
-//        "to attach the workgroup size information to a nested "
-//        "ExecutableExportOp");
-//  }
+// DiagnosedSilenceableFailure transform::ForallToWorkgroupOp::applyToOne(
+//     func::FuncOp target, transform::ApplyToEachResultList &results,
+//     transform::TransformState &state) {
+//   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel()))
+//   {
+//     return mlir::emitDefiniteFailure(
+//         state.getTopLevel(),
+//         "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel "
+//         "to attach the workgroup size information to a nested "
+//         "ExecutableExportOp");
+//   }
 //
-//  IREE::HAL::ExecutableExportOp exportOp;
-//  state.getTopLevel()->walk([&](IREE::HAL::ExecutableExportOp op) {
-//    if (op.getSymName() == target.getName()) exportOp = op;
-//  });
-//  if (!exportOp) {
-//    return mlir::emitSilenceableFailure(
-//        target, "no IREE::HAL::ExecutableExportOp found");
-//  }
+//   IREE::HAL::ExecutableExportOp exportOp;
+//   state.getTopLevel()->walk([&](IREE::HAL::ExecutableExportOp op) {
+//     if (op.getSymName() == target.getName()) exportOp = op;
+//   });
+//   if (!exportOp) {
+//     return mlir::emitSilenceableFailure(
+//         target, "no IREE::HAL::ExecutableExportOp found");
+//   }
 //
-//  scf::ForallOp topLevelForallOp;
-//  auto walkResult = target->walk([&](scf::ForallOp forallOp) {
-//    if (forallOp->getParentOfType<scf::ForallOp>())
-//      return WalkResult::advance();
-//    if (topLevelForallOp) return WalkResult::interrupt();
-//    topLevelForallOp = forallOp;
-//    return WalkResult::advance();
-//  });
+//   scf::ForallOp topLevelForallOp;
+//   auto walkResult = target->walk([&](scf::ForallOp forallOp) {
+//     if (forallOp->getParentOfType<scf::ForallOp>())
+//       return WalkResult::advance();
+//     if (topLevelForallOp) return WalkResult::interrupt();
+//     topLevelForallOp = forallOp;
+//     return WalkResult::advance();
+//   });
 //
-//  if (walkResult.wasInterrupted()) {
-//    return mlir::emitSilenceableFailure(
-//        target, "could not find a unique topLevel scf.forall");
-//  }
+//   if (walkResult.wasInterrupted()) {
+//     return mlir::emitSilenceableFailure(
+//         target, "could not find a unique topLevel scf.forall");
+//   }
 //
-//  SimplePatternRewriter rewriter(topLevelForallOp);
-//  if (failed(rewriteForallToWorkgroup(topLevelForallOp, exportOp, rewriter))) {
-//    return mlir::emitDefiniteFailure(target, "rewriteForallToWorkgroup failed");
-//  }
+//   SimplePatternRewriter rewriter(topLevelForallOp);
+//   if (failed(rewriteForallToWorkgroup(topLevelForallOp, exportOp, rewriter)))
+//   {
+//     return mlir::emitDefiniteFailure(target, "rewriteForallToWorkgroup
+//     failed");
+//   }
 //
-//  return DiagnosedSilenceableFailure::success();
-//}
+//   return DiagnosedSilenceableFailure::success();
+// }
 //
-//void transform::ForallToWorkgroupOp::getEffects(
-//    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-//  transform::onlyReadsHandle(getTarget(), effects);
-//  transform::modifiesPayload(effects);
-//}
+// void transform::ForallToWorkgroupOp::getEffects(
+//     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+//   transform::onlyReadsHandle(getTarget(), effects);
+//   transform::modifiesPayload(effects);
+// }
 
 //===---------------------------------------------------------------------===//
 // TileToForallAndWorkgroupCountRegionOp
 //===---------------------------------------------------------------------===//
 
-//void transform::TileToForallAndWorkgroupCountRegionOp::build(
-//    OpBuilder &builder, OperationState &result, Value target,
-//    ArrayRef<int64_t> staticTileSizes, transform::TileSizesSpec,
-//    ArrayAttr mappingAttr) {
-//  return build(builder, result, target,
-//               /*mixedTileSizes=*/
-//               getAsOpFoldResult(builder.getI64ArrayAttr(staticTileSizes)),
-//               /*_=*/transform::TileSizesSpec(), /*mapping=*/mappingAttr);
-//}
+// void transform::TileToForallAndWorkgroupCountRegionOp::build(
+//     OpBuilder &builder, OperationState &result, Value target,
+//     ArrayRef<int64_t> staticTileSizes, transform::TileSizesSpec,
+//     ArrayAttr mappingAttr) {
+//   return build(builder, result, target,
+//                /*mixedTileSizes=*/
+//                getAsOpFoldResult(builder.getI64ArrayAttr(staticTileSizes)),
+//                /*_=*/transform::TileSizesSpec(), /*mapping=*/mappingAttr);
+// }
 //
-//void transform::TileToForallAndWorkgroupCountRegionOp::build(
-//    OpBuilder &builder, OperationState &result, Value target,
-//    ArrayRef<OpFoldResult> mixedTileSizes, transform::TileSizesSpec,
-//    ArrayAttr mappingAttr) {
-//  assert(result.name.isRegistered() && "not registered!!");
-//  SmallVector<int64_t> staticTileSizes;
-//  SmallVector<Value> dynamicTileSizes;
-//  dispatchIndexOpFoldResults(mixedTileSizes, dynamicTileSizes, staticTileSizes);
-//  // Call the default builder which sets up the proper operands segment sizes
-//  // attributes for multiple variadic operands. In the absence of this,
-//  // horrible bugs ensue.
-//  MLIRContext *ctx = builder.getContext();
-//  auto operationType = pdl::OperationType::get(ctx);
+// void transform::TileToForallAndWorkgroupCountRegionOp::build(
+//     OpBuilder &builder, OperationState &result, Value target,
+//     ArrayRef<OpFoldResult> mixedTileSizes, transform::TileSizesSpec,
+//     ArrayAttr mappingAttr) {
+//   assert(result.name.isRegistered() && "not registered!!");
+//   SmallVector<int64_t> staticTileSizes;
+//   SmallVector<Value> dynamicTileSizes;
+//   dispatchIndexOpFoldResults(mixedTileSizes, dynamicTileSizes,
+//   staticTileSizes);
+//   // Call the default builder which sets up the proper operands segment sizes
+//   // attributes for multiple variadic operands. In the absence of this,
+//   // horrible bugs ensue.
+//   MLIRContext *ctx = builder.getContext();
+//   auto operationType = pdl::OperationType::get(ctx);
 //
-//  build(builder, result,
-//        /*resultTypes=*/TypeRange{operationType, operationType},
-//        /*target=*/target,
-//        /*numThreads=*/ValueRange{},
-//        /*tileSizes=*/dynamicTileSizes,
-//        /*staticNumThreads=*/ArrayRef<int64_t>(),
-//        /*staticTileSizes=*/staticTileSizes,
-//        /*mapping=*/mappingAttr);
-//}
+//   build(builder, result,
+//         /*resultTypes=*/TypeRange{operationType, operationType},
+//         /*target=*/target,
+//         /*numThreads=*/ValueRange{},
+//         /*tileSizes=*/dynamicTileSizes,
+//         /*staticNumThreads=*/ArrayRef<int64_t>(),
+//         /*staticTileSizes=*/staticTileSizes,
+//         /*mapping=*/mappingAttr);
+// }
 //
-//void transform::TileToForallAndWorkgroupCountRegionOp::build(
-//    OpBuilder &builder, OperationState &result, Value target,
-//    ArrayRef<int64_t> staticNumThreads, transform::NumThreadsSpec,
-//    ArrayAttr mappingAttr) {
-//  return build(builder, result,
-//               /*target=*/target,
-//               /*mixedNumThreads=*/
-//               getAsOpFoldResult(builder.getI64ArrayAttr(staticNumThreads)),
-//               /*_=*/transform::NumThreadsSpec(),
-//               /*mapping=*/mappingAttr);
-//}
+// void transform::TileToForallAndWorkgroupCountRegionOp::build(
+//     OpBuilder &builder, OperationState &result, Value target,
+//     ArrayRef<int64_t> staticNumThreads, transform::NumThreadsSpec,
+//     ArrayAttr mappingAttr) {
+//   return build(builder, result,
+//                /*target=*/target,
+//                /*mixedNumThreads=*/
+//                getAsOpFoldResult(builder.getI64ArrayAttr(staticNumThreads)),
+//                /*_=*/transform::NumThreadsSpec(),
+//                /*mapping=*/mappingAttr);
+// }
 //
-//void transform::TileToForallAndWorkgroupCountRegionOp::build(
-//    OpBuilder &builder, OperationState &result, Value target,
-//    ArrayRef<OpFoldResult> mixedNumThreads, transform::NumThreadsSpec,
-//    ArrayAttr mappingAttr) {
-//  assert(result.name.isRegistered() && "not registered!!");
-//  SmallVector<int64_t> staticNumThreads;
-//  SmallVector<Value> dynamicNumThreads;
-//  dispatchIndexOpFoldResults(mixedNumThreads, dynamicNumThreads,
-//                             staticNumThreads);
-//  // Call the default builder which sets up the proper operands segment sizes
-//  // attributes for multiple variadic operands. In the absence of this,
-//  // horrible bugs ensue.
-//  MLIRContext *ctx = builder.getContext();
-//  auto operationType = pdl::OperationType::get(ctx);
-//  build(builder, result,
-//        /*resultTypes=*/TypeRange{operationType, operationType},
-//        /*target=*/target,
-//        /*numThreads=*/dynamicNumThreads,
-//        /*tileSizes=*/ValueRange{},
-//        /*staticNumThreads=*/staticNumThreads,
-//        /*staticTileSizes=*/ArrayRef<int64_t>(),
-//        /*mapping=*/mappingAttr);
-//}
+// void transform::TileToForallAndWorkgroupCountRegionOp::build(
+//     OpBuilder &builder, OperationState &result, Value target,
+//     ArrayRef<OpFoldResult> mixedNumThreads, transform::NumThreadsSpec,
+//     ArrayAttr mappingAttr) {
+//   assert(result.name.isRegistered() && "not registered!!");
+//   SmallVector<int64_t> staticNumThreads;
+//   SmallVector<Value> dynamicNumThreads;
+//   dispatchIndexOpFoldResults(mixedNumThreads, dynamicNumThreads,
+//                              staticNumThreads);
+//   // Call the default builder which sets up the proper operands segment sizes
+//   // attributes for multiple variadic operands. In the absence of this,
+//   // horrible bugs ensue.
+//   MLIRContext *ctx = builder.getContext();
+//   auto operationType = pdl::OperationType::get(ctx);
+//   build(builder, result,
+//         /*resultTypes=*/TypeRange{operationType, operationType},
+//         /*target=*/target,
+//         /*numThreads=*/dynamicNumThreads,
+//         /*tileSizes=*/ValueRange{},
+//         /*staticNumThreads=*/staticNumThreads,
+//         /*staticTileSizes=*/ArrayRef<int64_t>(),
+//         /*mapping=*/mappingAttr);
+// }
 
 /// Lower the ops within the workgroup count region of `exportOp` that
 /// represents the workgroup count calculation, to the actual
@@ -847,190 +875,195 @@ transform::ShareForallOperandsOp::applyToOne(
 /// to `ceilDiv(workload, tileSizes)`.
 /// Note: transform::TransformState &state is passed to allow  unpacking
 /// pdl::OperationType handles on the fly.
-//static LogicalResult lowerWorkgroupCountComputingRegion(
-//    transform::TransformState &state, RewriterBase &rewriter, Location loc,
-//    HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> numThreads,
-//    ArrayRef<OpFoldResult> tileSizes, Optional<ArrayAttr> mapping) {
-//  Region &r = exportOp.getWorkgroupCount();
-//  if (!r.hasOneBlock()) {
-//    return rewriter.notifyMatchFailure(exportOp,
-//                                       "expected export op to have a workgroup "
-//                                       "count region with a single block");
-//  }
-//  auto workgroupCountOps =
-//      r.front().getOps<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>();
-//  if (!llvm::hasSingleElement(workgroupCountOps)) {
-//    return rewriter.notifyMatchFailure(
-//        exportOp,
-//        "expected region to have a single "
-//        "flow.dispatch.workgroup_count_from_dag_root op");
-//  }
-//  auto workgroupCountOp = *workgroupCountOps.begin();
-//  auto workload = workgroupCountOp.getOperands();
+// static LogicalResult lowerWorkgroupCountComputingRegion(
+//     transform::TransformState &state, RewriterBase &rewriter, Location loc,
+//     HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> numThreads,
+//     ArrayRef<OpFoldResult> tileSizes, std::optional<ArrayAttr> mapping) {
+//   Region &r = exportOp.getWorkgroupCount();
+//   if (!r.hasOneBlock()) {
+//     return rewriter.notifyMatchFailure(exportOp,
+//                                        "expected export op to have a
+//                                        workgroup " "count region with a
+//                                        single block");
+//   }
+//   auto workgroupCountOps =
+//       r.front().getOps<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>();
+//   if (!llvm::hasSingleElement(workgroupCountOps)) {
+//     return rewriter.notifyMatchFailure(
+//         exportOp,
+//         "expected region to have a single "
+//         "flow.dispatch.workgroup_count_from_dag_root op");
+//   }
+//   auto workgroupCountOp = *workgroupCountOps.begin();
+//   auto workload = workgroupCountOp.getOperands();
 //
-//  bool useNumThreads = !numThreads.empty();
-//  ArrayRef<OpFoldResult> tileSizesOrNumThreads =
-//      useNumThreads ? numThreads : tileSizes;
-//  StringRef kindStr = useNumThreads ? "num thread" : "tile size";
+//   bool useNumThreads = !numThreads.empty();
+//   ArrayRef<OpFoldResult> tileSizesOrNumThreads =
+//       useNumThreads ? numThreads : tileSizes;
+//   StringRef kindStr = useNumThreads ? "num thread" : "tile size";
 //
-//  SmallVector<OpFoldResult> unpackedTileSizesOrNumThreads;
-//  int64_t numTiledDims = 0;
-//  for (auto ofr : tileSizesOrNumThreads) {
-//    if (ofr.is<Value>() &&
-//        ofr.get<Value>().getType().isa<pdl::OperationType>()) {
-//      for (Operation *sizeProducer : state.getPayloadOps(ofr.get<Value>())) {
-//        if (sizeProducer->getNumResults() != 1) {
-//          auto diag = mlir::emitDefiniteFailure(sizeProducer)
-//                      << "the operation producing " << kindStr
-//                      << " must have one result";
-//          diag.attachNote(loc) << "when applying this transform";
-//          return diag;
-//        }
-//        unpackedTileSizesOrNumThreads.push_back(sizeProducer->getResult(0));
-//      }
-//    } else {
-//      unpackedTileSizesOrNumThreads.push_back(ofr);
-//    }
-//    if (!isConstantIntValue(unpackedTileSizesOrNumThreads.back(), 0))
-//      ++numTiledDims;
-//  }
+//   SmallVector<OpFoldResult> unpackedTileSizesOrNumThreads;
+//   int64_t numTiledDims = 0;
+//   for (auto ofr : tileSizesOrNumThreads) {
+//     if (ofr.is<Value>() &&
+//         ofr.get<Value>().getType().isa<pdl::OperationType>()) {
+//       for (Operation *sizeProducer : state.getPayloadOps(ofr.get<Value>())) {
+//         if (sizeProducer->getNumResults() != 1) {
+//           auto diag = mlir::emitDefiniteFailure(sizeProducer)
+//                       << "the operation producing " << kindStr
+//                       << " must have one result";
+//           diag.attachNote(loc) << "when applying this transform";
+//           return diag;
+//         }
+//         unpackedTileSizesOrNumThreads.push_back(sizeProducer->getResult(0));
+//       }
+//     } else {
+//       unpackedTileSizesOrNumThreads.push_back(ofr);
+//     }
+//     if (!isConstantIntValue(unpackedTileSizesOrNumThreads.back(), 0))
+//       ++numTiledDims;
+//   }
 //
-//  if (unpackedTileSizesOrNumThreads.size() > workload.size()) {
-//    return rewriter.notifyMatchFailure(
-//        exportOp,
-//        "number of " + kindStr + "s overflow the dimension from the workload");
-//  }
+//   if (unpackedTileSizesOrNumThreads.size() > workload.size()) {
+//     return rewriter.notifyMatchFailure(
+//         exportOp,
+//         "number of " + kindStr + "s overflow the dimension from the
+//         workload");
+//   }
 //
-//  // Generate permutation of tiled dims based on the specified mapping.
-//  SmallVector<int64_t> mappingPermutation;
-//  if (mapping.has_value()) {
-//    if (numTiledDims != mapping->size()) {
-//      return rewriter.notifyMatchFailure(exportOp,
-//                                         "number of mapping elements must "
-//                                         "match number of non-zero " +
-//                                             kindStr + "s");
-//    }
-//    for (DeviceMappingAttrInterface map : mapping.value())
-//      mappingPermutation.push_back(map.getMappingId());
-//  } else {
-//    // No mapping specified: No permutation.
-//    for (int64_t i = 0; i < numTiledDims; ++i) mappingPermutation.push_back(i);
-//  }
+//   // Generate permutation of tiled dims based on the specified mapping.
+//   SmallVector<int64_t> mappingPermutation;
+//   if (mapping.has_value()) {
+//     if (numTiledDims != mapping->size()) {
+//       return rewriter.notifyMatchFailure(exportOp,
+//                                          "number of mapping elements must "
+//                                          "match number of non-zero " +
+//                                              kindStr + "s");
+//     }
+//     for (DeviceMappingAttrInterface map : mapping.value())
+//       mappingPermutation.push_back(map.getMappingId());
+//   } else {
+//     // No mapping specified: No permutation.
+//     for (int64_t i = 0; i < numTiledDims; ++i)
+//     mappingPermutation.push_back(i);
+//   }
 //
-//  // Compute number of workgroups.
-//  SmallVector<OpFoldResult> workgroupCount(3, rewriter.getIndexAttr(1));
-//  OpBuilder::InsertionGuard g(rewriter);
-//  rewriter.setInsertionPoint(workgroupCountOp);
-//  loc = workgroupCountOp.getLoc();
-//  int64_t nextTiledDim = 0;
-//  for (int64_t workgroupsDim : mappingPermutation) {
-//    // Skip dims with tile size 0. These are not tiled.
-//    while (isConstantIntValue(unpackedTileSizesOrNumThreads[nextTiledDim], 0))
-//      ++nextTiledDim;
-//    if (useNumThreads) {
-//      workgroupCount[workgroupsDim] =
-//          unpackedTileSizesOrNumThreads[nextTiledDim];
-//    } else {
-//      AffineExpr s0, s1;
-//      bindSymbols(rewriter.getContext(), s0, s1);
-//      auto m = AffineMap::get(0, 2, s0.ceilDiv(s1));
-//      workgroupCount[workgroupsDim] = makeComposedFoldedAffineApply(
-//          rewriter, loc, m,
-//          ArrayRef<OpFoldResult>{workload[nextTiledDim],
-//                                 unpackedTileSizesOrNumThreads[nextTiledDim]});
-//    }
-//    ++nextTiledDim;
-//  }
+//   // Compute number of workgroups.
+//   SmallVector<OpFoldResult> workgroupCount(3, rewriter.getIndexAttr(1));
+//   OpBuilder::InsertionGuard g(rewriter);
+//   rewriter.setInsertionPoint(workgroupCountOp);
+//   loc = workgroupCountOp.getLoc();
+//   int64_t nextTiledDim = 0;
+//   for (int64_t workgroupsDim : mappingPermutation) {
+//     // Skip dims with tile size 0. These are not tiled.
+//     while (isConstantIntValue(unpackedTileSizesOrNumThreads[nextTiledDim],
+//     0))
+//       ++nextTiledDim;
+//     if (useNumThreads) {
+//       workgroupCount[workgroupsDim] =
+//           unpackedTileSizesOrNumThreads[nextTiledDim];
+//     } else {
+//       AffineExpr s0, s1;
+//       bindSymbols(rewriter.getContext(), s0, s1);
+//       auto m = AffineMap::get(0, 2, s0.ceilDiv(s1));
+//       workgroupCount[workgroupsDim] = makeComposedFoldedAffineApply(
+//           rewriter, loc, m,
+//           ArrayRef<OpFoldResult>{workload[nextTiledDim],
+//                                  unpackedTileSizesOrNumThreads[nextTiledDim]});
+//     }
+//     ++nextTiledDim;
+//   }
 //
-//  rewriter.replaceOp(workgroupCountOp, getValueOrCreateConstantIndexOp(
-//                                           rewriter, loc, workgroupCount));
-//  return success();
-//}
+//   rewriter.replaceOp(workgroupCountOp, getValueOrCreateConstantIndexOp(
+//                                            rewriter, loc, workgroupCount));
+//   return success();
+// }
 
-//SmallVector<OpFoldResult>
-//transform::TileToForallAndWorkgroupCountRegionOp::getMixedNumThreads() {
-//  Builder b(getContext());
-//  return getMixedValues(getStaticNumThreads(), getNumThreads(), b);
-//}
+// SmallVector<OpFoldResult>
+// transform::TileToForallAndWorkgroupCountRegionOp::getMixedNumThreads() {
+//   Builder b(getContext());
+//   return getMixedValues(getStaticNumThreads(), getNumThreads(), b);
+// }
 //
-//SmallVector<OpFoldResult>
-//transform::TileToForallAndWorkgroupCountRegionOp::getMixedTileSizes() {
-//  Builder b(getContext());
-//  return getMixedValues(getStaticTileSizes(), getTileSizes(), b);
-//}
+// SmallVector<OpFoldResult>
+// transform::TileToForallAndWorkgroupCountRegionOp::getMixedTileSizes() {
+//   Builder b(getContext());
+//   return getMixedValues(getStaticTileSizes(), getTileSizes(), b);
+// }
 //
-//LogicalResult
-//transform::TileToForallAndWorkgroupCountRegionOp::verify() {
-//  if (getMixedNumThreads().empty() == getMixedTileSizes().empty())
-//    return emitOpError("either num_threads or tile_sizes must be specified");
-//  return success();
-//}
+// LogicalResult
+// transform::TileToForallAndWorkgroupCountRegionOp::verify() {
+//   if (getMixedNumThreads().empty() == getMixedTileSizes().empty())
+//     return emitOpError("either num_threads or tile_sizes must be specified");
+//   return success();
+// }
 //
-//void transform::TileToForallAndWorkgroupCountRegionOp::getEffects(
-//    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-//  transform::consumesHandle(getTarget(), effects);
-//  transform::onlyReadsHandle(getTileSizes(), effects);
-//  transform::onlyReadsHandle(getNumThreads(), effects);
-//  transform::producesHandle(getResults(), effects);
-//  transform::modifiesPayload(effects);
-//}
+// void transform::TileToForallAndWorkgroupCountRegionOp::getEffects(
+//     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+//   transform::consumesHandle(getTarget(), effects);
+//   transform::onlyReadsHandle(getTileSizes(), effects);
+//   transform::onlyReadsHandle(getNumThreads(), effects);
+//   transform::producesHandle(getResults(), effects);
+//   transform::modifiesPayload(effects);
+// }
 
-//DiagnosedSilenceableFailure
-//transform::TileToForallAndWorkgroupCountRegionOp::apply(
-//    transform::TransformResults &transformResults,
-//    transform::TransformState &state) {
-//  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
-//  if (targetOps.empty()) {
-//    transformResults.set(getForallOp().cast<OpResult>(), {});
-//    transformResults.set(getTiledOp().cast<OpResult>(), {});
-//    return DiagnosedSilenceableFailure::success();
-//  }
-//  if (targetOps.size() != 1) {
-//    return mlir::emitDefiniteFailure(
-//               state.getTopLevel(),
-//               "expected single target op in payload, got: ")
-//           << targetOps.size();
-//  }
-//  auto funcOp = targetOps.front()->getParentOfType<func::FuncOp>();
-//  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-//  if (failed(exportOp)) {
-//    return mlir::emitDefiniteFailure(state.getTopLevel(),
-//                                     "couldn't find export op for func");
-//  }
+// DiagnosedSilenceableFailure
+// transform::TileToForallAndWorkgroupCountRegionOp::apply(
+//     transform::TransformResults &transformResults,
+//     transform::TransformState &state) {
+//   ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
+//   if (targetOps.empty()) {
+//     transformResults.set(getForallOp().cast<OpResult>(), {});
+//     transformResults.set(getTiledOp().cast<OpResult>(), {});
+//     return DiagnosedSilenceableFailure::success();
+//   }
+//   if (targetOps.size() != 1) {
+//     return mlir::emitDefiniteFailure(
+//                state.getTopLevel(),
+//                "expected single target op in payload, got: ")
+//            << targetOps.size();
+//   }
+//   auto funcOp = targetOps.front()->getParentOfType<func::FuncOp>();
+//   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
+//   if (failed(exportOp)) {
+//     return mlir::emitDefiniteFailure(state.getTopLevel(),
+//                                      "couldn't find export op for func");
+//   }
 //
-//  /// Lower the workgroup count region in keeping with the way dispatch
-//  /// regions are created by default in IREEs compilation flow.
-//  IRRewriter rewriter(getContext());
-//  if (failed(lowerWorkgroupCountComputingRegion(
-//          state, rewriter, getLoc(), exportOp.value(), getMixedNumThreads(),
-//          getMixedTileSizes(), getMapping()))) {
-//    return mlir::emitDefiniteFailure(exportOp.value(),
-//                                     "failed to lower workgroup count region");
-//  }
+//   /// Lower the workgroup count region in keeping with the way dispatch
+//   /// regions are created by default in IREEs compilation flow.
+//   IRRewriter rewriter(getContext());
+//   if (failed(lowerWorkgroupCountComputingRegion(
+//           state, rewriter, getLoc(), exportOp.value(), getMixedNumThreads(),
+//           getMixedTileSizes(), getMapping()))) {
+//     return mlir::emitDefiniteFailure(exportOp.value(),
+//                                      "failed to lower workgroup count
+//                                      region");
+//   }
 //
-//  ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
+//   ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
 //
-//  // Result payload ops.
-//  SmallVector<Operation *> tileOps;
-//  SmallVector<Operation *> tiledOps;
+//   // Result payload ops.
+//   SmallVector<Operation *> tileOps;
+//   SmallVector<Operation *> tiledOps;
 //
-//  DiagnosedSilenceableFailure diag = transform::tileToForallOpImpl(
-//      rewriter, state, cast<transform::TransformOpInterface>(getOperation()),
-//      targets, getMixedNumThreads(), getMixedTileSizes(), getMapping(), tileOps,
-//      tiledOps);
+//   DiagnosedSilenceableFailure diag = transform::tileToForallOpImpl(
+//       rewriter, state, cast<transform::TransformOpInterface>(getOperation()),
+//       targets, getMixedNumThreads(), getMixedTileSizes(), getMapping(),
+//       tileOps, tiledOps);
 //
-//  if (!diag.succeeded()) {
-//    transformResults.set(getForallOp().cast<OpResult>(),
-//                         SmallVector<mlir::Operation *>{});
-//    transformResults.set(getTiledOp().cast<OpResult>(),
-//                         SmallVector<mlir::Operation *>{});
-//    return diag;
-//  }
+//   if (!diag.succeeded()) {
+//     transformResults.set(getForallOp().cast<OpResult>(),
+//                          SmallVector<mlir::Operation *>{});
+//     transformResults.set(getTiledOp().cast<OpResult>(),
+//                          SmallVector<mlir::Operation *>{});
+//     return diag;
+//   }
 //
-//  transformResults.set(getForallOp().cast<OpResult>(), tileOps);
-//  transformResults.set(getTiledOp().cast<OpResult>(), tiledOps);
-//  return DiagnosedSilenceableFailure::success();
-//}
+//   transformResults.set(getForallOp().cast<OpResult>(), tileOps);
+//   transformResults.set(getTiledOp().cast<OpResult>(), tiledOps);
+//   return DiagnosedSilenceableFailure::success();
+// }
 
 //===---------------------------------------------------------------------===//
 // TransformBufferizeOp
@@ -1054,10 +1087,10 @@ using mlir::bufferization::OneShotAnalysisState;
 using mlir::bufferization::OneShotBufferizationOptions;
 
 void transform::TransformBufferizeOp::build(OpBuilder &builder,
-                                               OperationState &result,
-                                               Value target, bool targetGpu,
-                                               bool testAnalysisOnly,
-                                               bool printConflicts) {
+                                            OperationState &result,
+                                            Value target, bool targetGpu,
+                                            bool testAnalysisOnly,
+                                            bool printConflicts) {
   result.addOperands(target);
   if (targetGpu) {
     result.addAttribute(TransformBufferizeOp::getTargetGpuAttrName(result.name),
@@ -1069,8 +1102,9 @@ void transform::TransformBufferizeOp::build(OpBuilder &builder,
         builder.getUnitAttr());
   }
   if (printConflicts) {
-    result.addAttribute(TransformBufferizeOp::getPrintConflictsAttrName(result.name),
-                        builder.getUnitAttr());
+    result.addAttribute(
+        TransformBufferizeOp::getPrintConflictsAttrName(result.name),
+        builder.getUnitAttr());
   }
   MLIRContext *ctx = builder.getContext();
   result.addTypes(pdl::OperationType::get(ctx));
@@ -1187,22 +1221,20 @@ struct EmptyTensorLoweringPattern : public OpRewritePattern<tensor::EmptyOp> {
     return success();
   }
 };
-}  // namespace
+} // namespace
 
-namespace mlir {
+namespace mlir {}
 
-}
-
-DiagnosedSilenceableFailure transform::TransformBufferizeOp::apply(
-    transform::TransformResults &results, transform::TransformState &state) {
+DiagnosedSilenceableFailure
+transform::TransformBufferizeOp::apply(transform::TransformResults &results,
+                                       transform::TransformState &state) {
   ArrayRef<Operation *> payload = state.getPayloadOps(getTarget());
   if (payload.size() != 1 ||
-      !isa<ModuleOp/*, HAL::ExecutableOp, HAL::ExecutableVariantOp*/>(
+      !isa<ModuleOp /*, HAL::ExecutableOp, HAL::ExecutableVariantOp*/>(
           payload.front())) {
     return mlir::emitDefiniteFailure(
-        state.getTopLevel(),
-        "requires exactly a single HAL::ExecutableOp or "
-        "HAL::ExecutableVariantOp target op.");
+        state.getTopLevel(), "requires exactly a single HAL::ExecutableOp or "
+                             "HAL::ExecutableVariantOp target op.");
   }
 
   //===-------------------------------------------------------------------===//
@@ -1234,7 +1266,8 @@ DiagnosedSilenceableFailure transform::TransformBufferizeOp::apply(
     // overloads only accepts ops that are isolated from above.
     SmallVector<Operation *> ops;
     state.getTopLevel()->walk([&](Operation *nestedOp) {
-      if (state.getTopLevel() != nestedOp) ops.push_back(nestedOp);
+      if (state.getTopLevel() != nestedOp)
+        ops.push_back(nestedOp);
     });
     LogicalResult result =
         applyOpPatternsAndFold(ops, std::move(patterns), config);
@@ -1310,31 +1343,32 @@ void transform::TransformEliminateEmptyTensorsOp::getEffects(
 // EraseHALDescriptorTypeFromMemRef
 //===---------------------------------------------------------------------===//
 
-//DiagnosedSilenceableFailure
-//transform::IREEEraseHALDescriptorTypeFromMemRefOp::applyToOne(
-//    ::mlir::Operation *target,
-//    ::mlir::transform::ApplyToEachResultList &results,
-//    ::mlir::transform::TransformState &state) {
-//  if (!isa<func::FuncOp>(target)) {
-//    return mlir::emitDefiniteFailure(state.getTopLevel(),
-//                                     "expects a func::FuncOp as the target op");
-//  }
-//  auto funcOp = cast<func::FuncOp>(target);
+// DiagnosedSilenceableFailure
+// transform::IREEEraseHALDescriptorTypeFromMemRefOp::applyToOne(
+//     ::mlir::Operation *target,
+//     ::mlir::transform::ApplyToEachResultList &results,
+//     ::mlir::transform::TransformState &state) {
+//   if (!isa<func::FuncOp>(target)) {
+//     return mlir::emitDefiniteFailure(state.getTopLevel(),
+//                                      "expects a func::FuncOp as the target
+//                                      op");
+//   }
+//   auto funcOp = cast<func::FuncOp>(target);
 //
-//  if (failed(eraseHALDescriptorTypeFromMemRef(funcOp))) {
-//    return mlir::emitDefiniteFailure(
-//        state.getTopLevel(),
-//        "failed to erase #hal.descriptor_type as MemRef memory space");
-//  }
+//   if (failed(eraseHALDescriptorTypeFromMemRef(funcOp))) {
+//     return mlir::emitDefiniteFailure(
+//         state.getTopLevel(),
+//         "failed to erase #hal.descriptor_type as MemRef memory space");
+//   }
 //
-//  return DiagnosedSilenceableFailure::success();
-//}
+//   return DiagnosedSilenceableFailure::success();
+// }
 //
-//void transform::IREEEraseHALDescriptorTypeFromMemRefOp::getEffects(
-//    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-//  transform::onlyReadsHandle(getTarget(), effects);
-//  transform::modifiesPayload(effects);
-//}
+// void transform::IREEEraseHALDescriptorTypeFromMemRefOp::getEffects(
+//     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+//   transform::onlyReadsHandle(getTarget(), effects);
+//   transform::modifiesPayload(effects);
+// }
 
 #define GET_OP_CLASSES
 #include "CommonExtensionsOps.cpp.inc"

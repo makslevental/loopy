@@ -7,6 +7,7 @@
 #ifndef TRANSFORM_STRUCTUREDTRANSFORMOPSEXT_H
 #define TRANSFORM_STRUCTUREDTRANSFORMOPSEXT_H
 
+#include "mlir/Dialect/PDL/IR/PDLOps.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
@@ -54,7 +55,6 @@ namespace mlir {
 
 void registerTransformDialectStructuredExtension(DialectRegistry &registry);
 void registerTransformDialectStructuredExtension(MLIRContext &context);
-
 
 namespace transform {
 class StructuredTransformOpsExtension

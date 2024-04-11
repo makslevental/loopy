@@ -1,5 +1,4 @@
 import contextlib
-import ctypes
 import os
 import sys
 import tempfile
@@ -7,15 +6,15 @@ from contextlib import ExitStack
 from functools import wraps
 from io import StringIO
 from types import FunctionType
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Union
 
 from ._mlir import ir
 from ._mlir._mlir_libs._mlir.ir import (
-    FlatSymbolRefAttr,
     Attribute,
     ArrayAttr,
+    IntegerAttr,
+    IntegerType,
 )
-from ._mlir.dialects._structured_transform_ops_ext import _get_int64_attr
 from ._mlir.ir import (
     StringAttr,
     register_attribute_builder,
@@ -23,6 +22,12 @@ from ._mlir.ir import (
     Context,
 )
 from ._mlir.passmanager import PassManager
+
+
+def _get_int64_attr(value: Union[int, Attribute]) -> IntegerAttr:
+    if isinstance(value, int):
+        return IntegerAttr.get(IntegerType.get_signless(64), value)
+    return value
 
 
 class NelliMlirCompilerError(Exception):
@@ -35,7 +40,7 @@ class NelliMlirCompilerError(Exception):
 
 
 def get_module_name_for_debug_dump(module):
-    if not "nelli.debug_module_name" in module.operation.attributes:
+    if "nelli.debug_module_name" not in module.operation.attributes:
         return "UnnammedModule"
     return StringAttr(module.operation.attributes["nelli.debug_module_name"]).value
 
@@ -78,7 +83,7 @@ def run_pipeline(
 
         message = f"""\
             {description} failed with the following diagnostics:
-            
+
             {'*' * 80}
             {sys.stderr.getvalue().strip()}
             {'*' * 80}
@@ -119,7 +124,6 @@ def extract_wrapped(decorated):
     return next((c for c in closure if isinstance(c, FunctionType)), None)
 
 
-@register_attribute_builder("DenseI64ArrayAttr")
 def get_dense_int64_array_attr(
     values: Sequence[int], context: Optional[Context] = None
 ) -> DenseI64ArrayAttr:
@@ -130,22 +134,6 @@ def get_dense_int64_array_attr(
     if values is None:
         return DenseI64ArrayAttr.get([], context)
     return DenseI64ArrayAttr.get(values, context)
-
-
-@register_attribute_builder("I64ArrayAttr")
-def get_int64_array_attr(
-    values: Sequence[int], context: Optional[Context] = None
-) -> ArrayAttr:
-    from . import DefaultContext
-
-    if context is None:
-        context = DefaultContext
-    if values is None:
-        return ArrayAttr.get([])
-    if isinstance(values, ArrayAttr):
-        return values
-
-    return ArrayAttr.get([_get_int64_attr(v) for v in values], context=context)
 
 
 @register_attribute_builder("DeviceMappingArrayAttr")
@@ -181,27 +169,26 @@ def get_index_list_array_attr(
     return ArrayAttr.get(index_list, context=context)
 
 
-@register_attribute_builder("FlatSymbolRefAttr")
-def get_flat_symbol_ref_attr(
-    symbol: str, context: Optional[Context] = None
-) -> FlatSymbolRefAttr:
-    from . import DefaultContext
+# @register_attribute_builder("FlatSymbolRefAttr")
+# def get_flat_symbol_ref_attr(
+#     symbol: str, context: Optional[Context] = None
+# ) -> FlatSymbolRefAttr:
+#     from . import DefaultContext
+#
+#     if context is None:
+#         context = DefaultContext
+#     return FlatSymbolRefAttr.get(symbol, context)
 
-    if context is None:
-        context = DefaultContext
-    return FlatSymbolRefAttr.get(symbol, context)
 
-
-@register_attribute_builder("SymbolRefAttr")
-def get_symbol_ref_attr(
-    symbols: list[str], context: Optional[Context] = None
-) -> FlatSymbolRefAttr:
-    from . import DefaultContext
-
-    if context is None:
-        context = DefaultContext
-    qualname = "::".join([f"@{q}" for q in symbols])
-    return Attribute.parse(qualname, context)
+# def get_symbol_ref_attr(
+#     symbols: list[str], context: Optional[Context] = None
+# ) -> FlatSymbolRefAttr:
+#     from . import DefaultContext
+#
+#     if context is None:
+#         context = DefaultContext
+#     qualname = "::".join([f"@{q}" for q in symbols])
+#     return Attribute.parse(qualname, context)
 
 
 F32 = ir.F32Type.get()

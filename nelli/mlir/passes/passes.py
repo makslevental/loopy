@@ -17,7 +17,7 @@ class Pipeline:
     def WRAP(self, scope):
         assert (
             self._wrapper is None
-        ), f"you probably forgot to close a FUNC with a matching CNUF"
+        ), "you probably forgot to close a FUNC with a matching CNUF"
         self._wrapper = scope
         return self
 
@@ -29,7 +29,7 @@ class Pipeline:
     def FUNC(self):
         assert (
             self._wrapper is None
-        ), f"you probably forgot to close a FUNC with a matching CNUF"
+        ), "you probably forgot to close a FUNC with a matching CNUF"
         self._wrapper = "func.func"
         return self
 
@@ -41,7 +41,7 @@ class Pipeline:
     def SPIRV(self):
         assert (
             self._wrapper is None
-        ), f"you probably forgot to close a SPIRV with a matching VRIPS"
+        ), "you probably forgot to close a SPIRV with a matching VRIPS"
         self._wrapper = "spirv.module"
         return self
 
@@ -53,7 +53,7 @@ class Pipeline:
     def GPU(self):
         assert (
             self._wrapper is None
-        ), f"you probably forgot to close a GPU with a matching VRIPS"
+        ), "you probably forgot to close a GPU with a matching VRIPS"
         self._wrapper = "gpu.module"
         return self
 
@@ -1246,18 +1246,6 @@ class Pipeline:
             "promote-buffers-to-stack",
             max_alloc_size_in_bytes=max_alloc_size_in_bytes,
             max_rank_of_allocated_memref=max_rank_of_allocated_memref,
-        )
-        return self
-
-    def raise_scf_to_affine(
-        self, for_ops=None, load_ops=None, parallel_ops=None, store_ops=None
-    ):
-        self._add_pass(
-            "raise-scf-to-affine",
-            for_ops=for_ops,
-            load_ops=load_ops,
-            parallel_ops=parallel_ops,
-            store_ops=store_ops,
         )
         return self
 

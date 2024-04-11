@@ -29,23 +29,6 @@ from .utils import doublewrap
 from ..mlir._mlir.dialects import gpu
 
 
-# // CHECK: _ODS_OPERAND_SEGMENTS = [-1,1,0,]
-# def AttrSizedOperandsOp : TestOp<"attr_sized_operands",
-#                                  [AttrSizedOperandSegments]> {
-#   // CHECK: def __init__(self, variadic1, non_variadic, *, variadic2=None, loc=None, ip=None):
-#   // CHECK:   operands = []
-#   // CHECK:   results = []
-#   // CHECK:   attributes = {}
-#   // CHECK:   regions = None
-#   // CHECK:   operands.append(_get_op_results_or_values(variadic1))
-#   // CHECK:   operands.append(_get_op_result_or_value(non_variadic))
-#   // CHECK:   operands.append(_get_op_result_or_value(variadic2) if variadic2 is not None else None)
-#   // CHECK:   _ods_successors = None
-#   // CHECK:   super().__init__(self.build_generic(
-#   // CHECK:     attributes=attributes, results=results, operands=operands,
-#   // CHECK:     successors=_ods_successors, regions=regions, loc=loc, ip=ip))
-
-
 class LaunchFuncOp(gpu.LaunchFuncOp):
     def __init__(
         self,
@@ -417,7 +400,7 @@ class ModuleOp(gpu.GPUModuleOp):
 class ModuleOp(ModuleOp):
     def __init__(self, *, loc=None, ip=None):
         super().__init__(self.build_generic(results=[], operands=[], loc=loc, ip=ip))
-        body = self.regions[0].blocks.append()
+        self.regions[0].blocks.append()
 
     @property
     def body(self):
@@ -527,7 +510,7 @@ def all_reduce(op, val, uniform=False):
 def gpu_all_reduce_op_attr(
     op: str, context: Optional[Context] = None
 ) -> FlatSymbolRefAttr:
-    from .. import DefaultContext
+    from . import DefaultContext
 
     if context is None:
         context = DefaultContext

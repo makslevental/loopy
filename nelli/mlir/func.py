@@ -1,6 +1,10 @@
+import ast
+import inspect
 import logging
+from textwrap import dedent
+from types import FunctionType, CodeType
 
-logger = logging.getLogger(__name__)
+from bytecode import ConcreteBytecode, ConcreteInstr
 
 from ._mlir._mlir_libs._mlir.ir import (
     InsertionPoint,
@@ -10,15 +14,12 @@ from ._mlir._mlir_libs._mlir.ir import (
     TypeAttr,
     StringAttr,
 )
-
-import inspect
-import ast
-from textwrap import dedent
-from types import FunctionType, CodeType
-
-from bytecode import ConcreteBytecode, ConcreteInstr
-
+from .affine import RankedAffineMemRefValue
 from .affine import end_for as affine_endfor, affine_range
+from .annot import Annot
+from .arith import ArithValue
+from .memref import MemRefValue
+from .omp.omp import ws_loop as omp_range, end_for as omp_endfor
 from .scf import (
     scf_endif_branch,
     scf_if,
@@ -29,9 +30,13 @@ from .scf import (
     par_range as scf_par_range,
     end_parfor as scf_end_parfor,
 )
-from .omp.omp import ws_loop as omp_range, end_for as omp_endfor
-from .arith import ArithValue
+from .tensor import TensorValue
+from .utils import doublewrap, extract_wrapped
 from ..mlir._mlir.dialects import func as func_dialect
+from ..mlir._mlir.dialects._ods_common import (
+    get_op_result_or_value,
+    get_op_results_or_values,
+)
 from ..mlir._mlir.ir import (
     Type as MLIRType,
     MemRefType,
@@ -40,15 +45,8 @@ from ..mlir._mlir.ir import (
     FlatSymbolRefAttr,
     UnitAttr,
 )
-from ..mlir._mlir.dialects._ods_common import (
-    get_op_result_or_value,
-    get_op_results_or_values,
-)
-from .memref import MemRefValue
-from .affine import RankedAffineMemRefValue
-from .tensor import TensorValue
-from .utils import doublewrap, extract_wrapped
-from .annot import Annot
+
+logger = logging.getLogger(__name__)
 
 
 def ast_call(name, args=None):
@@ -92,7 +90,7 @@ def wrap_if_test(test):
             assert c.func.id == "constant"
             comparators.append(c)
         else:
-            raise RuntimeError(f"unknown kind of comparator {c=}")
+            raise RuntimeError(f"unknown kind of comparator c={ast.unparse(c)}")
 
     test = ast.Compare(
         ast_call(ArithValue.__name__, args=[test.left]),
@@ -393,7 +391,7 @@ def lazy_mlir_func(*args, **kwargs):
 
     assert (
         "mlir_module" in kwargs
-    ), f"lazy eval necessitates providing a container module"
+    ), "lazy eval necessitates providing a container module"
     mlir_module = kwargs.pop("mlir_module")
 
     def wrapped(*call_args):

@@ -171,7 +171,7 @@ static void applyLinalgToVectorPatterns(func::FuncOp funcOp) {
 
 static void applyPadTensorToGenericPatterns(func::FuncOp funcOp) {
   RewritePatternSet patterns(funcOp.getContext());
-  patterns.add<PadOpTransformationPattern>(funcOp.getContext());
+//  patterns.add<PadOpTransformationPattern>(funcOp.getContext());
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 

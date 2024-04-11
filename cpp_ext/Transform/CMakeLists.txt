@@ -1,6 +1,6 @@
-add_subdirectory(CommonExtensions)
-add_subdirectory(Structured)
-add_subdirectory(LLVMGPU)
+#add_subdirectory(CommonExtensions)
+#add_subdirectory(Structured)
+#add_subdirectory(LLVMGPU)
 
 add_mlir_library(
   DialectsTransforms
