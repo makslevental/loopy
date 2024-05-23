@@ -24,6 +24,7 @@ def scf_if(cond: ArithValue):
     assert isinstance(cond, ArithValue)
     global _if_ip, _current_if_op
     if_op = IfOp(cond)
+    cond.owner.move_before(if_op)
     _current_if_op.append(if_op)
     _if_ip = InsertionPoint(if_op.then_block)
     _if_ip.__enter__()
@@ -35,6 +36,13 @@ def scf_else():
     _if_ip = InsertionPoint(_current_if_op[-1].add_else())
     _if_ip.__enter__()
     return True
+
+
+def scf_else_if(cond):
+    global _if_ip, _current_if_op
+    _if_ip = InsertionPoint(_current_if_op[-1].add_else())
+    _if_ip.__enter__()
+    return scf_if(cond)
 
 
 def scf_endif_branch():

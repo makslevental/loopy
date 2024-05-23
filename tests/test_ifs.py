@@ -6,7 +6,7 @@ from nelli.mlir.utils import F64
 from nelli.mlir.affine import RankedAffineMemRefValue as MemRef
 from nelli.mlir.arith import constant
 from nelli.mlir.func import mlir_func
-from nelli.mlir.scf import scf_if, scf_endif_branch, scf_else, scf_endif
+from nelli.mlir.scf import scf_if, scf_endif_branch, scf_else, scf_endif, scf_else_if
 from nelli.utils import mlir_mod_ctx
 from util import check_correct
 
@@ -362,3 +362,56 @@ class TestIfs:
                         k = constant(1)
 
             # print(module)
+
+    def test_elif_without_rewriting_ast(self):
+        with mlir_mod_ctx() as module:
+
+            @mlir_func(rewrite_ast_=False)
+            def ifs(M: F64, N: F64):
+                one = constant(1.0)
+                if scf_if(M < N):
+                    one = constant(1.0)
+                    mem = MemRef.alloca([10, 10], F64)
+                    scf_endif_branch()
+                elif scf_else_if(M > N):
+                    one = constant(3.0)
+                    mem = MemRef.alloca([30, 30], F64)
+                    scf_endif_branch()
+                else:
+                    scf_else()
+                    two = constant(2.0)
+                    mem = MemRef.alloca([20, 20], F64)
+                    # two here to add yield for outer if
+                    scf_endif_branch()
+                    scf_endif_branch()
+                    # this doesn't do anything mlir-module wise (just pops a stack of handles)
+                    # could be renamed
+                    scf_endif()
+
+                return None
+
+        correct = dedent(
+            """\
+        module {
+          func.func @ifs(%arg0: f64, %arg1: f64) {
+            %cst = arith.constant 1.000000e+00 : f64
+            %0 = arith.cmpf olt, %arg0, %arg1 : f64
+            scf.if %0 {
+              %cst_0 = arith.constant 1.000000e+00 : f64
+              %alloca = memref.alloca() : memref<10x10xf64>
+            } else {
+              %1 = arith.cmpf ogt, %arg0, %arg1 : f64
+              scf.if %1 {
+                %cst_0 = arith.constant 3.000000e+00 : f64
+                %alloca = memref.alloca() : memref<30x30xf64>
+              } else {
+                %cst_0 = arith.constant 2.000000e+00 : f64
+                %alloca = memref.alloca() : memref<20x20xf64>
+              }
+            }
+            return
+          }
+        }
+        """
+        )
+        check_correct(correct, module)
