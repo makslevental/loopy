@@ -24,15 +24,18 @@ def get_llvm_url():
         system
     ]
     LIB_ARCH = os.environ.get("LIB_ARCH", platform.machine())
-    assert LIB_ARCH, "empty LIB_ARCH"
     if LIB_ARCH == "aarch64":
         LIB_ARCH = "arm64"
-    # print(f"ARCH {LIB_ARCH}")
-    LLVM_RELEASE_VERSION = os.environ.get("LLVM_RELEASE_VERSION", "398d68f624d667a17727d346a2139a951a1ebce4")
+    # https://github.com/pypa/cibuildwheel/discussions/997#discussioncomment-2037536
+    archflags = os.getenv("ARCHFLAGS", "")
+    if "arm64" in archflags:
+        LIB_ARCH = "arm64"
+    LLVM_RELEASE_VERSION = os.environ.get(
+        "LLVM_RELEASE_VERSION", "398d68f624d667a17727d346a2139a951a1ebce4"
+    )
     assert LLVM_RELEASE_VERSION, "empty LLVM_RELEASE_VERSION"
     # print(f"ARCH {LIB_ARCH}")
     name = f"llvm+mlir+openmp-{sys.version_info.major}.{sys.version_info.minor}-17.0.0-{LIB_ARCH}-{system_suffix}-release"
-    # https://github.com/makslevental/llvm-releases/releases/download/llvm-17.0.0-398d68f624d667a17727d346a2139a951a1ebce4/llvm+mlir+openmp-3.10-17.0.0-arm64-apple-darwin-release.tar.xz
     url = f"https://github.com/makslevental/llvm-releases/releases/download/llvm-17.0.0-{LLVM_RELEASE_VERSION}/{name}.tar.xz"
     return url
 
@@ -59,6 +62,7 @@ class CMakeBuild(build_ext):
         cmake_args = [
             f"-DCMAKE_INSTALL_PREFIX={ext_build_lib_dir}/{PACKAGE_NAME}/mlir",
             f"-DPython3_EXECUTABLE={sys.executable}",
+            "-DLLVM_ENABLE_LIBEDIT=0",
             f"-DCMAKE_BUILD_TYPE={cfg}",  # not used on MSVC, but no harm
         ]
         llvm_install_dir = os.environ.get("LLVM_INSTALL_DIR", None)
@@ -81,6 +85,7 @@ class CMakeBuild(build_ext):
                 pass
 
         if sys.platform.lower().startswith("darwin"):
+            cmake_args += ["-DCMAKE_OSX_DEPLOYMENT_TARGET=12"]
             # Cross-compile support for macOS - respect ARCHFLAGS if set
             archs = re.findall(r"-arch (\S+)", os.environ.get("ARCHFLAGS", ""))
             if archs:
